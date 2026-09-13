@@ -15,30 +15,55 @@ class CuanPartyApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF090909),
-        fontFamily: 'sans',
+        fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFD4AF37),
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
       ),
-      home: const SplashPage(),
+      home: const LoginPage(),
     );
   }
 }
 
-class SplashPage extends StatefulWidget {
-  const SplashPage({super.key});
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
 
   @override
-  State<SplashPage> createState() => _SplashPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _SplashPageState extends State<SplashPage> {
+class _LoginPageState extends State<LoginPage> {
+  late TextEditingController _phoneController;
+  bool _isLoading = false;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1400), () {
+    _phoneController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _handleLogin() {
+    if (_phoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan nomor HP Anda'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomePage()),
@@ -47,33 +72,296 @@ class _SplashPageState extends State<SplashPage> {
     });
   }
 
+  void _handleRegister() {
+    if (_phoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan nomor HP Anda'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pendaftaran berhasil! Silahkan masuk.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _phoneController.clear();
+        setState(() => _isLoading = false);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.mic_rounded, size: 76, color: Color(0xFFD4AF37)),
-            SizedBox(height: 18),
-            Text(
-              'CUAN PARTY',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 2.2,
-              ),
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF1a1410),
+              const Color(0xFF0f0d0a),
+              const Color(0xFF0d0a07),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+                // Logo & Brand
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFFD4AF37).withOpacity(0.3),
+                        const Color(0xFFD4AF37).withOpacity(0.1),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.mic_rounded,
+                    size: 60,
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Title
+                const Text(
+                  'CUAN PARTY',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
+                    color: Color(0xFFD4AF37),
+                    shadows: [
+                      Shadow(
+                        offset: Offset(0, 4),
+                        blurRadius: 12,
+                        color: Color(0xFFD4AF37),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'CONNECT • PARTY • EARN',
+                  style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 2.5,
+                    color: Colors.white54,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 56),
+                // Phone Input
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF1a1410).withOpacity(0.8),
+                        const Color(0xFF0f0d0a).withOpacity(0.6),
+                      ],
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _phoneController,
+                    enabled: !_isLoading,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan Nomor HP',
+                      hintStyle: TextStyle(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Icon(
+                          Icons.phone_rounded,
+                          color: Color(0xFFD4AF37),
+                          size: 22,
+                        ),
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 0,
+                        minHeight: 0,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 18,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Login Button
+                AnimatedOpacity(
+                  opacity: _isLoading ? 0.6 : 1.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Container(
+                    width: double.infinity,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFFD4AF37),
+                          const Color(0xFFC19A1B),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          offset: const Offset(0, 8),
+                          blurRadius: 20,
+                          color: const Color(0xFFD4AF37).withOpacity(0.4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isLoading ? null : _handleLogin,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Center(
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF090909),
+                                    strokeWidth: 3,
+                                  ),
+                                )
+                              : const Text(
+                                  'MASUK',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.5,
+                                    color: Color(0xFF090909),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Register Button
+                AnimatedOpacity(
+                  opacity: _isLoading ? 0.6 : 1.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Container(
+                    width: double.infinity,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37),
+                        width: 2,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isLoading ? null : _handleRegister,
+                        borderRadius: BorderRadius.circular(16),
+                        child: const Center(
+                          child: Text(
+                            'DAFTAR',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                              color: Color(0xFFD4AF37),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 48),
+                // Bottom Info
+                Column(
+                  children: [
+                    Text(
+                      'Dengan masuk, Anda menyetujui',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white54,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Syarat & Ketentuan',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: const Color(0xFFD4AF37),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                        Text(
+                          ' dan ',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white54,
+                          ),
+                        ),
+                        Text(
+                          'Kebijakan Privasi',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: const Color(0xFFD4AF37),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
-            SizedBox(height: 8),
-            Text(
-              'CONNECT • PARTY • EARN',
-              style: TextStyle(
-                fontSize: 11,
-                letterSpacing: 2,
-                color: Colors.white54,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -88,34 +376,69 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int index = 0;
-
-  final pages = const [
-    _HomeContent(),
-    _PartyContent(),
-    _InboxContent(),
-    _RankingContent(),
-    _ProfileContent(),
-  ];
+  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: pages[index]),
-      bottomNavigationBar: NavigationBar(
+      body: SafeArea(
+        child: _buildPage(_currentIndex),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+        },
         backgroundColor: const Color(0xFF0E0E0E),
-        indicatorColor: const Color(0xFF332B13),
-        selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.mic_none), selectedIcon: Icon(Icons.mic), label: 'Party'),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Inbox'),
-          NavigationDestination(icon: Icon(Icons.emoji_events_outlined), selectedIcon: Icon(Icons.emoji_events), label: 'Rank'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+        selectedItemColor: const Color(0xFFD4AF37),
+        unselectedItemColor: Colors.white54,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.mic_none),
+            activeIcon: Icon(Icons.mic),
+            label: 'Party',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
+            label: 'Inbox',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.emoji_events_outlined),
+            activeIcon: Icon(Icons.emoji_events),
+            label: 'Rank',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const _HomeContent();
+      case 1:
+        return const _PartyContent();
+      case 2:
+        return const _InboxContent();
+      case 3:
+        return const _RankingContent();
+      case 4:
+        return const _ProfileContent();
+      default:
+        return const _HomeContent();
+    }
   }
 }
 
@@ -125,241 +448,302 @@ class _HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+      padding: const EdgeInsets.all(16),
       children: [
+        // Header
         Row(
           children: [
-            const CircleAvatar(
-              radius: 21,
-              backgroundColor: Color(0xFF2A2413),
-              child: Icon(Icons.person, color: Color(0xFFD4AF37)),
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFD4AF37).withOpacity(0.3),
+                    const Color(0xFFD4AF37).withOpacity(0.1),
+                  ],
+                ),
+                border: Border.all(
+                  color: const Color(0xFFD4AF37),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.person,
+                color: Color(0xFFD4AF37),
+              ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             const Expanded(
-              child: Text('CUAN PARTY', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CUAN PARTY',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  Text(
+                    'Welcome Back!',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _iconButton(Icons.diamond_outlined),
-            const SizedBox(width: 4),
-            _iconButton(Icons.notifications_none),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1a1410),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFD4AF37).withOpacity(0.2),
+                ),
+              ),
+              child: const Icon(
+                Icons.notifications_none,
+                color: Color(0xFFD4AF37),
+                size: 20,
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 18),
-        TextField(
-          decoration: InputDecoration(
-            hintText: 'Search room or user...',
-            prefixIcon: const Icon(Icons.search),
-            filled: true,
-            fillColor: const Color(0xFF151515),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 24),
+        // Search Bar
         Container(
-          height: 145,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF241D0B), Color(0xFF110F0A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFFD4AF37).withOpacity(0.2),
             ),
-            border: Border.all(color: const Color(0xFF6E5B22)),
           ),
-          padding: const EdgeInsets.all(20),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('WEEKLY PARTY', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.w800, letterSpacing: 1.5)),
-              Spacer(),
-              Text('Join the party', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-              SizedBox(height: 5),
-              Text('Event banner • server controlled', style: TextStyle(color: Colors.white60)),
-            ],
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search room or user...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: Color(0xFFD4AF37),
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
           ),
         ),
         const SizedBox(height: 24),
-        const _SectionTitle(title: '🔥 Popular Rooms'),
-        const SizedBox(height: 10),
-        const _RoomCard(title: 'PARTY MALAM INI', host: 'Cuan Host', users: '125'),
-        const _RoomCard(title: 'NIGHT PARTY', host: 'DJ Cuan', users: '89'),
-        const _RoomCard(title: 'SANTAI DULU', host: 'Kak Party', users: '64'),
-        const SizedBox(height: 18),
-        const _SectionTitle(title: 'Recommended'),
-        const SizedBox(height: 10),
-        const _RoomCard(title: 'CUAN LOUNGE', host: 'Host Official', users: '42'),
+        // Banner
+        Container(
+          height: 140,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFFD4AF37).withOpacity(0.15),
+                const Color(0xFFD4AF37).withOpacity(0.05),
+              ],
+            ),
+            border: Border.all(
+              color: const Color(0xFFD4AF37).withOpacity(0.2),
+            ),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '🔥 WEEKLY PARTY',
+                style: TextStyle(
+                  color: Color(0xFFD4AF37),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                  fontSize: 12,
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Join the Party Tonight!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Limited slots available',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+        // Popular Rooms Section
+        const Text(
+          '🔥 Popular Rooms',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildRoomCard('PARTY MALAM INI', 'Cuan Host', '125'),
+        _buildRoomCard('NIGHT PARTY', 'DJ Cuan', '89'),
+        _buildRoomCard('SANTAI DULU', 'Kak Party', '64'),
+        const SizedBox(height: 28),
+        // Recommended Section
+        const Text(
+          '✨ Recommended',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildRoomCard('CUAN LOUNGE', 'Host Official', '42'),
       ],
     );
   }
 
-  static Widget _iconButton(IconData icon) {
+  Widget _buildRoomCard(String title, String host, String users) {
     return Container(
-      width: 42,
-      height: 42,
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF151515),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: Icon(icon, size: 21, color: const Color(0xFFD4AF37)),
-    );
-  }
-}
-
-class _RoomCard extends StatelessWidget {
-  final String title;
-  final String host;
-  final String users;
-
-  const _RoomCard({required this.title, required this.host, required this.users});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: const Color(0xFF121212),
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFF2A2413),
-          child: Icon(Icons.mic, color: Color(0xFFD4AF37)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFD4AF37).withOpacity(0.1),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text('$host  •  👥 $users'),
-        trailing: const Icon(Icons.chevron_right, color: Color(0xFFD4AF37)),
-        onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomPage()));
-        },
+        color: const Color(0xFF121212),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFD4AF37).withOpacity(0.2),
+                const Color(0xFFD4AF37).withOpacity(0.05),
+              ],
+            ),
+            border: Border.all(
+              color: const Color(0xFFD4AF37).withOpacity(0.3),
+            ),
+          ),
+          child: const Icon(
+            Icons.mic,
+            color: Color(0xFFD4AF37),
+            size: 20,
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          '$host  •  👥 $users',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: Color(0xFFD4AF37),
+        ),
+        onTap: () {},
       ),
     );
   }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  const _SectionTitle({required this.title});
-
-  @override
-  Widget build(BuildContext context) => Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800));
 }
 
 class _PartyContent extends StatelessWidget {
   const _PartyContent();
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Party Discovery', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)));
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Party Discovery',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFD4AF37),
+        ),
+      ),
+    );
+  }
 }
 
 class _InboxContent extends StatelessWidget {
   const _InboxContent();
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Inbox', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)));
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Inbox',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFD4AF37),
+        ),
+      ),
+    );
+  }
 }
 
 class _RankingContent extends StatelessWidget {
   const _RankingContent();
+
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Ranking', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)));
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Ranking',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFD4AF37),
+        ),
+      ),
+    );
+  }
 }
 
 class _ProfileContent extends StatelessWidget {
   const _ProfileContent();
-  @override
-  Widget build(BuildContext context) => const Center(child: Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)));
-}
-
-class RoomPage extends StatelessWidget {
-  const RoomPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF070707),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: const Text('PARTY MALAM INI'),
-        actions: const [Icon(Icons.more_vert)],
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 12),
-          const Text('ROOM LEVEL 8', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.w800)),
-          const SizedBox(height: 24),
-          const CircleAvatar(
-            radius: 40,
-            backgroundColor: Color(0xFF2A2413),
-            child: Icon(Icons.person, size: 45, color: Color(0xFFD4AF37)),
-          ),
-          const SizedBox(height: 8),
-          const Text('👑 Cuan Host', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 28),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _Seat(),
-              _Seat(),
-              _Seat(active: true),
-              _Seat(),
-              _Seat(),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            height: 220,
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: const Color(0xFF0E0E0E),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('💬 Chat', style: TextStyle(fontWeight: FontWeight.w800)),
-                SizedBox(height: 14),
-                Text('Welcome to the party!'),
-                SizedBox(height: 8),
-                Text('🔥🔥🔥'),
-              ],
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _action(Icons.chat_bubble_outline, 'Chat'),
-                  _action(Icons.card_giftcard, 'Gift'),
-                  _action(Icons.favorite_border, 'React'),
-                  _action(Icons.mic_none, 'Mic'),
-                ],
-              ),
-            ),
-          ),
-        ],
+    return const Center(
+      child: Text(
+        'Profile',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFD4AF37),
+        ),
       ),
     );
   }
-
-  static Widget _action(IconData icon, String label) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [Icon(icon, color: const Color(0xFFD4AF37)), const SizedBox(height: 3), Text(label, style: const TextStyle(fontSize: 11))],
-  );
-}
-
-class _Seat extends StatelessWidget {
-  final bool active;
-  const _Seat({this.active = false});
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      CircleAvatar(
-        radius: 25,
-        backgroundColor: active ? const Color(0xFF5B4A18) : const Color(0xFF1C1C1C),
-        child: Icon(active ? Icons.mic : Icons.person_outline, color: active ? const Color(0xFFD4AF37) : Colors.white54),
-      ),
-      const SizedBox(height: 5),
-      const Text('Seat', style: TextStyle(fontSize: 10, color: Colors.white60)),
-    ],
-  );
 }
