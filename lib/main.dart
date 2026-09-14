@@ -1051,19 +1051,6 @@ class _WalletPageState extends State<WalletPage> {
     }
   }
 
-  String _getTransactionColor(String type) {
-    switch (type) {
-      case 'recharge':
-        return 'positive';
-      case 'gift':
-        return 'negative';
-      case 'earn':
-        return 'positive';
-      default:
-        return 'neutral';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1237,126 +1224,180 @@ class _WalletPageState extends State<WalletPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Transactions List
-                  _transactions.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 32),
+                  // Transactions List Container dengan Dark Background
+                  if (_transactions.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: const Color(0xFF0F0D0A),
+                          border: Border.all(
+                            color: const Color(0xFFD4AF37).withOpacity(0.15),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.receipt_long_outlined,
-                                size: 48,
-                                color: Colors.white30,
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'No transactions yet',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white54,
-                                ),
-                              ),
+                              ..._transactions.asMap().entries.expand((entry) {
+                                final index = entry.key;
+                                final transaction = entry.value;
+                                final isPositive = transaction.amount > 0;
+                                final isLast = index == _transactions.length - 1;
+
+                                return [
+                                  // Transaction Item
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: index % 2 == 0
+                                          ? const Color(0xFF0F0D0A)
+                                          : const Color(0xFF1a1410).withOpacity(0.5),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Icon Container
+                                        Container(
+                                          width: 48,
+                                          height: 48,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                const Color(0xFFD4AF37)
+                                                    .withOpacity(0.2),
+                                                const Color(0xFFD4AF37)
+                                                    .withOpacity(0.08),
+                                              ],
+                                            ),
+                                            border: Border.all(
+                                              color: const Color(0xFFD4AF37)
+                                                  .withOpacity(0.25),
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              _getTransactionIcon(
+                                                  transaction.type),
+                                              style: const TextStyle(
+                                                fontSize: 24,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        // Description & Date
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                transaction.description,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.white,
+                                                  letterSpacing: 0.2,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 5),
+                                              Text(
+                                                DateFormat('dd MMM yyyy • HH:mm', 'id_ID')
+                                                    .format(transaction.timestamp),
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.white60,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Amount Badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            color: isPositive
+                                                ? Colors.green.withOpacity(0.15)
+                                                : Colors.red.withOpacity(0.15),
+                                          ),
+                                          child: Text(
+                                            '${isPositive ? '+' : ''}${_formatCurrency(transaction.amount)}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: isPositive
+                                                  ? const Color(0xFF4ADE80)
+                                                  : const Color(0xFFF87171),
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Separator (except for last item)
+                                  if (!isLast)
+                                    Container(
+                                      margin:
+                                          const EdgeInsets.symmetric(horizontal: 12),
+                                      height: 1,
+                                      color: const Color(0xFFD4AF37)
+                                          .withOpacity(0.08),
+                                    ),
+                                ];
+                              }).toList(),
                             ],
                           ),
-                        )
-                      : ListView.builder(
-                          physics: const NeverScrollableScrollPhysics(),
-                          shrinkWrap: true,
-                          itemCount: _transactions.length,
-                          itemBuilder: (context, index) {
-                            final transaction = _transactions[index];
-                            final isPositive = transaction.amount > 0;
-
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: const Color(0xFFD4AF37)
-                                        .withOpacity(0.1),
-                                  ),
-                                  color: const Color(0xFF121212),
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    // Icon
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            const Color(0xFFD4AF37)
-                                                .withOpacity(0.15),
-                                            const Color(0xFFD4AF37)
-                                                .withOpacity(0.05),
-                                          ],
-                                        ),
-                                        border: Border.all(
-                                          color: const Color(0xFFD4AF37)
-                                              .withOpacity(0.2),
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          _getTransactionIcon(
-                                              transaction.type),
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // Description
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            transaction.description,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            DateFormat('dd MMM HH:mm', 'id_ID')
-                                                .format(transaction
-                                                    .timestamp),
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.white54,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    // Amount
-                                    Text(
-                                      '${isPositive ? '+' : ''}${_formatCurrency(transaction.amount)}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: isPositive
-                                            ? Colors.green
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
                         ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: const Color(0xFF0F0D0A),
+                          border: Border.all(
+                            color: const Color(0xFFD4AF37).withOpacity(0.15),
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 48),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 48,
+                              color: Colors.white30,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No transactions yet',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 24),
                 ],
               ),
