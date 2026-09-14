@@ -632,45 +632,61 @@ class _HomeContent extends StatelessWidget {
         ),
         color: const Color(0xFF121212),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFFD4AF37).withOpacity(0.2),
-                const Color(0xFFD4AF37).withOpacity(0.05),
-              ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RoomPage(
+                  roomName: title,
+                  hostName: host,
+                  userCount: users,
+                ),
+              ),
+            );
+          },
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFD4AF37).withOpacity(0.2),
+                    const Color(0xFFD4AF37).withOpacity(0.05),
+                  ],
+                ),
+                border: Border.all(
+                  color: const Color(0xFFD4AF37).withOpacity(0.3),
+                ),
+              ),
+              child: const Icon(
+                Icons.mic,
+                color: Color(0xFFD4AF37),
+                size: 20,
+              ),
             ),
-            border: Border.all(
-              color: const Color(0xFFD4AF37).withOpacity(0.3),
+            title: Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+            subtitle: Text(
+              '$host  •  👥 $users',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: Color(0xFFD4AF37),
             ),
           ),
-          child: const Icon(
-            Icons.mic,
-            color: Color(0xFFD4AF37),
-            size: 20,
-          ),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
-          ),
-        ),
-        subtitle: Text(
-          '$host  •  👥 $users',
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: Color(0xFFD4AF37),
-        ),
-        onTap: () {},
       ),
     );
   }
@@ -743,6 +759,243 @@ class _ProfileContent extends StatelessWidget {
           fontWeight: FontWeight.w900,
           color: Color(0xFFD4AF37),
         ),
+      ),
+    );
+  }
+}
+
+class RoomPage extends StatelessWidget {
+  final String roomName;
+  final String hostName;
+  final String userCount;
+
+  const RoomPage({
+    super.key,
+    required this.roomName,
+    required this.hostName,
+    required this.userCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop();
+        return false;
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Header dengan tombol keluar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          roomName,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFD4AF37),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Host: $hostName',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1a1410),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFD4AF37).withOpacity(0.3),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white70,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF333333), height: 1),
+              // Main content area dengan 9 seats
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
+                      // Grid 3x3 untuk 9 seat
+                      Expanded(
+                        child: GridView.count(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          children: List.generate(
+                            9,
+                            (index) => _buildSeat(index),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+              // Bottom control buttons
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildControlButton(Icons.mic, 'Mic', () {}),
+                    _buildControlButton(Icons.chat_bubble, 'Chat', () {}),
+                    _buildControlButton(Icons.card_giftcard, 'Gift', () {}),
+                    _buildControlButton(
+                      Icons.logout,
+                      'Keluar',
+                      () => Navigator.of(context).pop(),
+                      isExit: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeat(int index) {
+    // Seat pertama (index 0) adalah user sendiri, seat lainnya kosong
+    bool isYourSeat = index == 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isYourSeat
+              ? [
+                  const Color(0xFFD4AF37).withOpacity(0.3),
+                  const Color(0xFFD4AF37).withOpacity(0.1),
+                ]
+              : [
+                  const Color(0xFF1a1410).withOpacity(0.5),
+                  const Color(0xFF0f0d0a).withOpacity(0.3),
+                ],
+        ),
+        border: Border.all(
+          color: isYourSeat
+              ? const Color(0xFFD4AF37)
+              : const Color(0xFFD4AF37).withOpacity(0.2),
+          width: isYourSeat ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.person_circle,
+            color: isYourSeat
+                ? const Color(0xFFD4AF37)
+                : Colors.white30,
+            size: 40,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isYourSeat ? 'You' : '',
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFFD4AF37),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    bool isExit = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isExit
+                    ? [
+                        Colors.red.withOpacity(0.3),
+                        Colors.red.withOpacity(0.1),
+                      ]
+                    : [
+                        const Color(0xFFD4AF37).withOpacity(0.2),
+                        const Color(0xFFD4AF37).withOpacity(0.05),
+                      ],
+              ),
+              border: Border.all(
+                color: isExit
+                    ? Colors.red.withOpacity(0.5)
+                    : const Color(0xFFD4AF37).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isExit ? Colors.red : const Color(0xFFD4AF37),
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isExit ? Colors.red : const Color(0xFFD4AF37),
+            ),
+          ),
+        ],
       ),
     );
   }
