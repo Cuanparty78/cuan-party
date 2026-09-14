@@ -603,9 +603,9 @@ class _HomeContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _buildRoomCard('PARTY MALAM INI', 'Cuan Host', '125'),
-        _buildRoomCard('NIGHT PARTY', 'DJ Cuan', '89'),
-        _buildRoomCard('SANTAI DULU', 'Kak Party', '64'),
+        _buildRoomCard(context, 'PARTY MALAM INI', 'Cuan Host', '125'),
+        _buildRoomCard(context, 'NIGHT PARTY', 'DJ Cuan', '89'),
+        _buildRoomCard(context, 'SANTAI DULU', 'Kak Party', '64'),
         const SizedBox(height: 28),
         // Recommended Section
         const Text(
@@ -617,12 +617,12 @@ class _HomeContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _buildRoomCard('CUAN LOUNGE', 'Host Official', '42'),
+        _buildRoomCard(context, 'CUAN LOUNGE', 'Host Official', '42'),
       ],
     );
   }
 
-  Widget _buildRoomCard(String title, String host, String users) {
+  Widget _buildRoomCard(BuildContext context, String title, String host, String users) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -924,7 +924,7 @@ class RoomPage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.person_circle,
+            Icons.account_circle,
             color: isYourSeat
                 ? const Color(0xFFD4AF37)
                 : Colors.white30,
