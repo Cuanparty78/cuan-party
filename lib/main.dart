@@ -1,7 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(const CuanPartyApp());
+}
+
+// Transaction Model
+class Transaction {
+  final String type; // 'recharge', 'gift', 'earn'
+  final int amount;
+  final DateTime timestamp;
+  final String description;
+
+  Transaction({
+    required this.type,
+    required this.amount,
+    required this.timestamp,
+    required this.description,
+  });
 }
 
 class CuanPartyApp extends StatelessWidget {
@@ -497,6 +513,33 @@ class _HomeContent extends StatelessWidget {
                 ],
               ),
             ),
+            // Wallet Button
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const WalletPage(),
+                  ),
+                );
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1a1410),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.wallet_rounded,
+                  color: Color(0xFFD4AF37),
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             Container(
               width: 44,
               height: 44,
@@ -534,6 +577,82 @@ class _HomeContent extends StatelessWidget {
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // COIN Balance Card (Tap to open Wallet)
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const WalletPage(),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFFD4AF37).withOpacity(0.2),
+                  const Color(0xFFD4AF37).withOpacity(0.08),
+                ],
+              ),
+              border: Border.all(
+                color: const Color(0xFFD4AF37).withOpacity(0.4),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'My Balance',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      '💰 100,000,000 COIN',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFD4AF37),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFD4AF37).withOpacity(0.3),
+                        const Color(0xFFD4AF37).withOpacity(0.1),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withOpacity(0.4),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Color(0xFFD4AF37),
+                    size: 20,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -778,6 +897,642 @@ class RoomPage extends StatefulWidget {
 
   @override
   State<RoomPage> createState() => _RoomPageState();
+}
+
+class WalletPage extends StatefulWidget {
+  const WalletPage({super.key});
+
+  @override
+  State<WalletPage> createState() => _WalletPageState();
+}
+
+class _WalletPageState extends State<WalletPage> {
+  late int _coinBalance;
+  late List<Transaction> _transactions;
+  bool _showRechargeModal = false;
+  final TextEditingController _rechargeController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _coinBalance = 100000000; // 100 juta coin
+    _transactions = [
+      Transaction(
+        type: 'earn',
+        amount: 50000,
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+        description: 'Earn dari Party MALAM INI',
+      ),
+      Transaction(
+        type: 'gift',
+        amount: -100000,
+        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
+        description: 'Kirim Gift Diamond 💎',
+      ),
+      Transaction(
+        type: 'recharge',
+        amount: 500000,
+        timestamp: DateTime.now().subtract(const Duration(days: 1)),
+        description: 'Recharge Coin',
+      ),
+      Transaction(
+        type: 'earn',
+        amount: 250000,
+        timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
+        description: 'Earn dari Party NIGHT PARTY',
+      ),
+      Transaction(
+        type: 'gift',
+        amount: -50000,
+        timestamp: DateTime.now().subtract(const Duration(days: 2)),
+        description: 'Kirim Gift Rose 🌹',
+      ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _rechargeController.dispose();
+    super.dispose();
+  }
+
+  void _handleRecharge() {
+    final amount = int.tryParse(_rechargeController.text) ?? 0;
+    if (amount > 0) {
+      setState(() {
+        _coinBalance += amount;
+        _transactions.insert(
+          0,
+          Transaction(
+            type: 'recharge',
+            amount: amount,
+            timestamp: DateTime.now(),
+            description: 'Recharge Coin',
+          ),
+        );
+        _rechargeController.clear();
+        _showRechargeModal = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Berhasil Recharge ${NumberFormat('#,##0', 'id_ID').format(amount)} Coin'),
+          backgroundColor: const Color(0xFFD4AF37).withOpacity(0.8),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  String _formatCurrency(int amount) {
+    return NumberFormat('#,##0', 'id_ID').format(amount);
+  }
+
+  String _getTransactionIcon(String type) {
+    switch (type) {
+      case 'recharge':
+        return '💰';
+      case 'gift':
+        return '🎁';
+      case 'earn':
+        return '⭐';
+      default:
+        return '💱';
+    }
+  }
+
+  String _getTransactionColor(String type) {
+    switch (type) {
+      case 'recharge':
+        return 'positive';
+      case 'gift':
+        return 'negative';
+      case 'earn':
+        return 'positive';
+      default:
+        return 'neutral';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Header
+            SliverAppBar(
+              floating: true,
+              pinned: true,
+              backgroundColor: const Color(0xFF090909),
+              leading: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1a1410),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withOpacity(0.3),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.chevron_left,
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+              ),
+              title: const Text(
+                'My Wallet',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                  color: Color(0xFFD4AF37),
+                ),
+              ),
+              centerTitle: true,
+              elevation: 0,
+              toolbarHeight: 70,
+            ),
+            // Content
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  // Balance Card
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFD4AF37).withOpacity(0.2),
+                            const Color(0xFFD4AF37).withOpacity(0.05),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFFD4AF37).withOpacity(0.3),
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Total Balance',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '💰 ${_formatCurrency(_coinBalance)}',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFD4AF37),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'COIN',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white54,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Recharge Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _showRechargeModal = true);
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFFD4AF37),
+                              const Color(0xFFC19A1B),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              offset: const Offset(0, 8),
+                              blurRadius: 20,
+                              color: const Color(0xFFD4AF37).withOpacity(0.4),
+                            ),
+                          ],
+                        ),
+                        child: const Material(
+                          color: Colors.transparent,
+                          child: Center(
+                            child: Text(
+                              'RECHARGE COIN',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.5,
+                                color: Color(0xFF090909),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Transaction History Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Transaction History',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          '${_transactions.length}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFFD4AF37),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Transactions List
+                  _transactions.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.receipt_long_outlined,
+                                size: 48,
+                                color: Colors.white30,
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'No transactions yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          shrinkWrap: true,
+                          itemCount: _transactions.length,
+                          itemBuilder: (context, index) {
+                            final transaction = _transactions[index];
+                            final isPositive = transaction.amount > 0;
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFD4AF37)
+                                        .withOpacity(0.1),
+                                  ),
+                                  color: const Color(0xFF121212),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    // Icon
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            const Color(0xFFD4AF37)
+                                                .withOpacity(0.15),
+                                            const Color(0xFFD4AF37)
+                                                .withOpacity(0.05),
+                                          ],
+                                        ),
+                                        border: Border.all(
+                                          color: const Color(0xFFD4AF37)
+                                              .withOpacity(0.2),
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _getTransactionIcon(
+                                              transaction.type),
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    // Description
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            transaction.description,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            DateFormat('dd MMM HH:mm', 'id_ID')
+                                                .format(transaction
+                                                    .timestamp),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Amount
+                                    Text(
+                                      '${isPositive ? '+' : ''}${_formatCurrency(transaction.amount)}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: isPositive
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      // Recharge Modal
+      bottomSheet: _showRechargeModal
+          ? Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0f0d0a),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                border: Border(
+                  top: BorderSide(
+                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Recharge Coin',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFD4AF37),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() => _showRechargeModal = false);
+                              _rechargeController.clear();
+                            },
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white54,
+                              size: 24,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Input Field
+                      const Text(
+                        'Jumlah Coin',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFFD4AF37).withOpacity(0.3),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _rechargeController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan jumlah...',
+                            hintStyle: const TextStyle(
+                              color: Colors.white54,
+                            ),
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                '💰',
+                                style: TextStyle(fontSize: 20),
+                              ),
+                            ),
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 0,
+                              minHeight: 0,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Quick Amount Buttons
+                      const Text(
+                        'Quick Select',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          100000,
+                          500000,
+                          1000000,
+                          5000000,
+                        ]
+                            .map((amount) => GestureDetector(
+                                  onTap: () {
+                                    _rechargeController.text =
+                                        amount.toString();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(0xFFD4AF37)
+                                            .withOpacity(0.3),
+                                      ),
+                                      color: const Color(0xFF1a1410),
+                                    ),
+                                    child: Text(
+                                      _formatCurrency(amount),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFD4AF37),
+                                      ),
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 20),
+                      // Confirm Button
+                      GestureDetector(
+                        onTap: _handleRecharge,
+                        child: Container(
+                          width: double.infinity,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                const Color(0xFFD4AF37),
+                                const Color(0xFFC19A1B),
+                              ],
+                            ),
+                          ),
+                          child: const Material(
+                            color: Colors.transparent,
+                            child: Center(
+                              child: Text(
+                                'CONFIRM RECHARGE',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.5,
+                                  color: Color(0xFF090909),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Cancel Button
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _showRechargeModal = false);
+                          _rechargeController.clear();
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFD4AF37).withOpacity(0.3),
+                            ),
+                          ),
+                          child: const Material(
+                            color: Colors.transparent,
+                            child: Center(
+                              child: Text(
+                                'CANCEL',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.5,
+                                  color: Color(0xFFD4AF37),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : null,
+    );
+  }
 }
 
 class _RoomPageState extends State<RoomPage> {
