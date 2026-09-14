@@ -20,6 +20,64 @@ class Transaction {
   });
 }
 
+// Global App State
+class GlobalAppState {
+  static final GlobalAppState _instance = GlobalAppState._internal();
+  
+  late ValueNotifier<int> coinBalance;
+  late ValueNotifier<List<Transaction>> transactions;
+
+  factory GlobalAppState() {
+    return _instance;
+  }
+
+  GlobalAppState._internal() {
+    coinBalance = ValueNotifier(100000000); // 100 juta coin
+    transactions = ValueNotifier([
+      Transaction(
+        type: 'earn',
+        amount: 50000,
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+        description: 'Earn dari Party MALAM INI',
+      ),
+      Transaction(
+        type: 'gift',
+        amount: -100000,
+        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
+        description: 'Kirim Gift Diamond 💎',
+      ),
+      Transaction(
+        type: 'recharge',
+        amount: 500000,
+        timestamp: DateTime.now().subtract(const Duration(days: 1)),
+        description: 'Recharge Coin',
+      ),
+      Transaction(
+        type: 'earn',
+        amount: 250000,
+        timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
+        description: 'Earn dari Party NIGHT PARTY',
+      ),
+      Transaction(
+        type: 'gift',
+        amount: -50000,
+        timestamp: DateTime.now().subtract(const Duration(days: 2)),
+        description: 'Kirim Gift Rose 🌹',
+      ),
+    ]);
+  }
+
+  void addTransaction(Transaction transaction) {
+    final currentList = transactions.value;
+    currentList.insert(0, transaction);
+    transactions.value = List.from(currentList);
+  }
+
+  void updateBalance(int amount) {
+    coinBalance.value += amount;
+  }
+}
+
 class CuanPartyApp extends StatelessWidget {
   const CuanPartyApp({super.key});
 
@@ -911,47 +969,39 @@ class _WalletPageState extends State<WalletPage> {
   late List<Transaction> _transactions;
   bool _showRechargeModal = false;
   final TextEditingController _rechargeController = TextEditingController();
+  final GlobalAppState _appState = GlobalAppState();
 
   @override
   void initState() {
     super.initState();
-    _coinBalance = 100000000; // 100 juta coin
-    _transactions = [
-      Transaction(
-        type: 'earn',
-        amount: 50000,
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        description: 'Earn dari Party MALAM INI',
-      ),
-      Transaction(
-        type: 'gift',
-        amount: -100000,
-        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        description: 'Kirim Gift Diamond 💎',
-      ),
-      Transaction(
-        type: 'recharge',
-        amount: 500000,
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        description: 'Recharge Coin',
-      ),
-      Transaction(
-        type: 'earn',
-        amount: 250000,
-        timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-        description: 'Earn dari Party NIGHT PARTY',
-      ),
-      Transaction(
-        type: 'gift',
-        amount: -50000,
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        description: 'Kirim Gift Rose 🌹',
-      ),
-    ];
+    _coinBalance = _appState.coinBalance.value;
+    _transactions = _appState.transactions.value;
+    
+    // Listen to global state changes
+    _appState.coinBalance.addListener(_updateBalance);
+    _appState.transactions.addListener(_updateTransactions);
+  }
+
+  void _updateBalance() {
+    if (mounted) {
+      setState(() {
+        _coinBalance = _appState.coinBalance.value;
+      });
+    }
+  }
+
+  void _updateTransactions() {
+    if (mounted) {
+      setState(() {
+        _transactions = _appState.transactions.value;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _appState.coinBalance.removeListener(_updateBalance);
+    _appState.transactions.removeListener(_updateTransactions);
     _rechargeController.dispose();
     super.dispose();
   }
@@ -959,17 +1009,17 @@ class _WalletPageState extends State<WalletPage> {
   void _handleRecharge() {
     final amount = int.tryParse(_rechargeController.text) ?? 0;
     if (amount > 0) {
+      _appState.updateBalance(amount);
+      _appState.addTransaction(
+        Transaction(
+          type: 'recharge',
+          amount: amount,
+          timestamp: DateTime.now(),
+          description: 'Recharge Coin',
+        ),
+      );
+      
       setState(() {
-        _coinBalance += amount;
-        _transactions.insert(
-          0,
-          Transaction(
-            type: 'recharge',
-            amount: amount,
-            timestamp: DateTime.now(),
-            description: 'Recharge Coin',
-          ),
-        );
         _rechargeController.clear();
         _showRechargeModal = false;
       });
@@ -1542,15 +1592,16 @@ class _RoomPageState extends State<RoomPage> {
   bool _showChatPanel = false;
   bool _showGiftPanel = false;
   List<String> _messages = [];
+  final GlobalAppState _appState = GlobalAppState();
 
-  // Dummy gift data
+  // Gift data with price in coins
   final List<Map<String, dynamic>> _gifts = [
-    {'name': 'Rose 🌹', 'price': '10k'},
-    {'name': 'Heart ❤️', 'price': '25k'},
-    {'name': 'Diamond 💎', 'price': '50k'},
-    {'name': 'Ring 💍', 'price': '100k'},
-    {'name': 'Crown 👑', 'price': '250k'},
-    {'name': 'Rocket 🚀', 'price': '500k'},
+    {'name': 'Rose 🌹', 'emoji': '🌹', 'price': 10000, 'displayPrice': '10k'},
+    {'name': 'Heart ❤️', 'emoji': '❤️', 'price': 25000, 'displayPrice': '25k'},
+    {'name': 'Diamond 💎', 'emoji': '💎', 'price': 50000, 'displayPrice': '50k'},
+    {'name': 'Ring 💍', 'emoji': '💍', 'price': 100000, 'displayPrice': '100k'},
+    {'name': 'Crown 👑', 'emoji': '👑', 'price': 250000, 'displayPrice': '250k'},
+    {'name': 'Rocket 🚀', 'emoji': '🚀', 'price': 500000, 'displayPrice': '500k'},
   ];
 
   @override
@@ -1590,15 +1641,47 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  void _sendGift(String giftName, String price) {
+  void _sendGift(String giftName, int giftPrice, String giftEmoji) {
+    final currentBalance = _appState.coinBalance.value;
+    
+    // Validasi saldo tidak cukup
+    if (currentBalance < giftPrice) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saldo COIN tidak cukup! Diperlukan ${NumberFormat('#,##0', 'id_ID').format(giftPrice)} COIN'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    // Kurangi saldo
+    _appState.updateBalance(-giftPrice);
+    
+    // Tambahkan transaksi ke history
+    _appState.addTransaction(
+      Transaction(
+        type: 'gift',
+        amount: -giftPrice,
+        timestamp: DateTime.now(),
+        description: 'Kirim Gift $giftName',
+      ),
+    );
+    
+    // Tampilkan success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Terima kasih! Anda mengirim $giftName ($price)'),
+        content: Text('$giftEmoji Terima kasih! Anda mengirim $giftName (-${NumberFormat('#,##0', 'id_ID').format(giftPrice)} COIN)'),
         backgroundColor: const Color(0xFFD4AF37).withOpacity(0.8),
         duration: const Duration(seconds: 2),
       ),
     );
-    Navigator.of(context).pop();
+    
+    // Tutup gift panel TANPA menutup RoomPage
+    setState(() {
+      _showGiftPanel = false;
+    });
   }
 
   @override
@@ -1957,7 +2040,11 @@ class _RoomPageState extends State<RoomPage> {
                                 final gift = _gifts[index];
                                 return GestureDetector(
                                   onTap: () {
-                                    _sendGift(gift['name'], gift['price']);
+                                    _sendGift(
+                                      gift['name'],
+                                      gift['price'],
+                                      gift['emoji'],
+                                    );
                                   },
                                   child: Container(
                                     decoration: BoxDecoration(
@@ -1980,7 +2067,7 @@ class _RoomPageState extends State<RoomPage> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          gift['name'],
+                                          gift['emoji'],
                                           style: const TextStyle(
                                             fontSize: 24,
                                             height: 1,
@@ -1988,7 +2075,7 @@ class _RoomPageState extends State<RoomPage> {
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
-                                          gift['price'],
+                                          gift['displayPrice'],
                                           style: const TextStyle(
                                             fontSize: 11,
                                             color: Color(0xFFD4AF37),
