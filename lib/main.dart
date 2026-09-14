@@ -764,7 +764,7 @@ class _ProfileContent extends StatelessWidget {
   }
 }
 
-class RoomPage extends StatelessWidget {
+class RoomPage extends StatefulWidget {
   final String roomName;
   final String hostName;
   final String userCount;
@@ -777,6 +777,76 @@ class RoomPage extends StatelessWidget {
   });
 
   @override
+  State<RoomPage> createState() => _RoomPageState();
+}
+
+class _RoomPageState extends State<RoomPage> {
+  late TextEditingController _chatController;
+  bool _isMicOn = false;
+  int? _selectedSeat;
+  bool _showChatPanel = false;
+  bool _showGiftPanel = false;
+  List<String> _messages = [];
+
+  // Dummy gift data
+  final List<Map<String, dynamic>> _gifts = [
+    {'name': 'Rose 🌹', 'price': '10k'},
+    {'name': 'Heart ❤️', 'price': '25k'},
+    {'name': 'Diamond 💎', 'price': '50k'},
+    {'name': 'Ring 💍', 'price': '100k'},
+    {'name': 'Crown 👑', 'price': '250k'},
+    {'name': 'Rocket 🚀', 'price': '500k'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _chatController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _chatController.dispose();
+    super.dispose();
+  }
+
+  void _toggleMic() {
+    setState(() {
+      _isMicOn = !_isMicOn;
+    });
+  }
+
+  void _selectSeat(int index) {
+    setState(() {
+      if (_selectedSeat == index) {
+        _selectedSeat = null;
+      } else {
+        _selectedSeat = index;
+      }
+    });
+  }
+
+  void _sendMessage() {
+    if (_chatController.text.isNotEmpty) {
+      setState(() {
+        _messages.add(_chatController.text);
+        _chatController.clear();
+      });
+    }
+  }
+
+  void _sendGift(String giftName, String price) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Terima kasih! Anda mengirim $giftName ($price)'),
+        backgroundColor: const Color(0xFFD4AF37).withOpacity(0.8),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    Navigator.of(context).pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
@@ -784,162 +854,472 @@ class RoomPage extends StatelessWidget {
         return false;
       },
       child: Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Header dengan tombol keluar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  // Header dengan tombol keluar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          roomName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFD4AF37),
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.roomName,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFD4AF37),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Host: ${widget.hostName}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Host: $hostName',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1a1410),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFD4AF37).withOpacity(0.3),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white70,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1a1410),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFD4AF37).withOpacity(0.3),
+                  ),
+                  const Divider(color: Color(0xFF333333), height: 1),
+                  // Main content area dengan 9 seats
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          // Grid 3x3 untuk 9 seat
+                          Expanded(
+                            child: GridView.count(
+                              crossAxisCount: 3,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              children: List.generate(
+                                9,
+                                (index) => _buildSeat(index),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white70,
-                          size: 24,
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Bottom control buttons
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: const Color(0xFFD4AF37).withOpacity(0.1),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildControlButton(
+                          _isMicOn ? Icons.mic : Icons.mic_none,
+                          'Mic',
+                          _toggleMic,
+                          isActive: _isMicOn,
+                        ),
+                        _buildControlButton(
+                          Icons.chat_bubble,
+                          'Chat',
+                          () {
+                            setState(() {
+                              _showChatPanel = !_showChatPanel;
+                              _showGiftPanel = false;
+                            });
+                          },
+                          isActive: _showChatPanel,
+                        ),
+                        _buildControlButton(
+                          Icons.card_giftcard,
+                          'Gift',
+                          () {
+                            setState(() {
+                              _showGiftPanel = !_showGiftPanel;
+                              _showChatPanel = false;
+                            });
+                          },
+                          isActive: _showGiftPanel,
+                        ),
+                        _buildControlButton(
+                          Icons.logout,
+                          'Keluar',
+                          () => Navigator.of(context).pop(),
+                          isExit: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const Divider(color: Color(0xFF333333), height: 1),
-              // Main content area dengan 9 seats
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 16),
-                      // Grid 3x3 untuk 9 seat
-                      Expanded(
-                        child: GridView.count(
-                          crossAxisCount: 3,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          children: List.generate(
-                            9,
-                            (index) => _buildSeat(index),
+            ),
+            // Chat Panel
+            if (_showChatPanel)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0f0d0a),
+                    border: Border(
+                      top: BorderSide(
+                        color: const Color(0xFFD4AF37).withOpacity(0.2),
+                      ),
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Chat messages area
+                        Container(
+                          height: 200,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1a1410).withOpacity(0.5),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(16),
+                              topRight: Radius.circular(16),
+                            ),
+                          ),
+                          child: _messages.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'Tidak ada pesan',
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: _messages.length,
+                                  itemBuilder: (context, index) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  const Color(0xFFD4AF37).withOpacity(0.3),
+                                                  const Color(0xFFD4AF37).withOpacity(0.1),
+                                                ],
+                                              ),
+                                            ),
+                                            child: const Icon(
+                                              Icons.person,
+                                              size: 14,
+                                              color: Color(0xFFD4AF37),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _messages[index],
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                        // Chat input
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFD4AF37).withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: TextField(
+                                    controller: _chatController,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'Tulis pesan...',
+                                      hintStyle: const TextStyle(
+                                        color: Colors.white54,
+                                      ),
+                                      border: InputBorder.none,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: _sendMessage,
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        const Color(0xFFD4AF37),
+                                        const Color(0xFFC19A1B),
+                                      ],
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.send,
+                                    color: Color(0xFF090909),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            // Gift Panel
+            if (_showGiftPanel)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0f0d0a),
+                    border: Border(
+                      top: BorderSide(
+                        color: const Color(0xFFD4AF37).withOpacity(0.2),
                       ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              // Bottom control buttons
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                  child: SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Pilih Gift',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFD4AF37),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _showGiftPanel = false;
+                                  });
+                                },
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white54,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(
+                          color: Color(0xFF333333),
+                          height: 1,
+                        ),
+                        Container(
+                          height: 220,
+                          padding: const EdgeInsets.all(12),
+                          child: GridView.count(
+                            crossAxisCount: 3,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1,
+                            children: List.generate(
+                              _gifts.length,
+                              (index) {
+                                final gift = _gifts[index];
+                                return GestureDetector(
+                                  onTap: () {
+                                    _sendGift(gift['name'], gift['price']);
+                                  },
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          const Color(0xFFD4AF37).withOpacity(0.15),
+                                          const Color(0xFFD4AF37).withOpacity(0.05),
+                                        ],
+                                      ),
+                                      border: Border.all(
+                                        color: const Color(0xFFD4AF37)
+                                            .withOpacity(0.2),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          gift['name'],
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            height: 1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          gift['price'],
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFFD4AF37),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildControlButton(Icons.mic, 'Mic', () {}),
-                    _buildControlButton(Icons.chat_bubble, 'Chat', () {}),
-                    _buildControlButton(Icons.card_giftcard, 'Gift', () {}),
-                    _buildControlButton(
-                      Icons.logout,
-                      'Keluar',
-                      () => Navigator.of(context).pop(),
-                      isExit: true,
-                    ),
-                  ],
-                ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildSeat(int index) {
-    // Seat pertama (index 0) adalah user sendiri, seat lainnya kosong
     bool isYourSeat = index == 0;
+    bool isSelected = _selectedSeat == index;
 
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isYourSeat
-              ? [
-                  const Color(0xFFD4AF37).withOpacity(0.3),
-                  const Color(0xFFD4AF37).withOpacity(0.1),
-                ]
-              : [
-                  const Color(0xFF1a1410).withOpacity(0.5),
-                  const Color(0xFF0f0d0a).withOpacity(0.3),
-                ],
-        ),
-        border: Border.all(
-          color: isYourSeat
-              ? const Color(0xFFD4AF37)
-              : const Color(0xFFD4AF37).withOpacity(0.2),
-          width: isYourSeat ? 2 : 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.account_circle,
+    return GestureDetector(
+      onTap: () => _selectSeat(index),
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isYourSeat
+                ? [
+                    const Color(0xFFD4AF37).withOpacity(0.3),
+                    const Color(0xFFD4AF37).withOpacity(0.1),
+                  ]
+                : isSelected
+                    ? [
+                        const Color(0xFFD4AF37).withOpacity(0.25),
+                        const Color(0xFFD4AF37).withOpacity(0.1),
+                      ]
+                    : [
+                        const Color(0xFF1a1410).withOpacity(0.5),
+                        const Color(0xFF0f0d0a).withOpacity(0.3),
+                      ],
+          ),
+          border: Border.all(
             color: isYourSeat
                 ? const Color(0xFFD4AF37)
-                : Colors.white30,
-            size: 40,
+                : isSelected
+                    ? const Color(0xFFD4AF37)
+                    : const Color(0xFFD4AF37).withOpacity(0.2),
+            width: (isYourSeat || isSelected) ? 2 : 1,
           ),
-          const SizedBox(height: 8),
-          Text(
-            isYourSeat ? 'You' : '',
-            style: const TextStyle(
-              fontSize: 10,
-              color: Color(0xFFD4AF37),
-              fontWeight: FontWeight.w700,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.account_circle,
+              color: isYourSeat || isSelected
+                  ? const Color(0xFFD4AF37)
+                  : Colors.white30,
+              size: 40,
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              isYourSeat
+                  ? 'You'
+                  : isSelected
+                      ? 'Terpilih'
+                      : '',
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFFD4AF37),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -949,6 +1329,7 @@ class RoomPage extends StatelessWidget {
     String label,
     VoidCallback onTap, {
     bool isExit = false,
+    bool isActive = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -968,16 +1349,23 @@ class RoomPage extends StatelessWidget {
                         Colors.red.withOpacity(0.3),
                         Colors.red.withOpacity(0.1),
                       ]
-                    : [
-                        const Color(0xFFD4AF37).withOpacity(0.2),
-                        const Color(0xFFD4AF37).withOpacity(0.05),
-                      ],
+                    : isActive
+                        ? [
+                            const Color(0xFFD4AF37).withOpacity(0.4),
+                            const Color(0xFFD4AF37).withOpacity(0.2),
+                          ]
+                        : [
+                            const Color(0xFFD4AF37).withOpacity(0.2),
+                            const Color(0xFFD4AF37).withOpacity(0.05),
+                          ],
               ),
               border: Border.all(
                 color: isExit
                     ? Colors.red.withOpacity(0.5)
-                    : const Color(0xFFD4AF37).withOpacity(0.3),
-                width: 1.5,
+                    : isActive
+                        ? const Color(0xFFD4AF37)
+                        : const Color(0xFFD4AF37).withOpacity(0.3),
+                width: isActive ? 2 : 1.5,
               ),
             ),
             child: Icon(
