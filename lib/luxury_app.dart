@@ -685,7 +685,7 @@ class _HomeContent extends StatelessWidget {
               ),
               SizedBox(height: 9),
               Text(
-                'Find Your Voice\\nFind Your People',
+                'Find Your Voice\nFind Your People',
                 style: TextStyle(
                   color: champagne,
                   fontSize: 23,
