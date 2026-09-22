@@ -850,7 +850,15 @@ class _ProfileContent extends StatelessWidget {
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(color: gold.withOpacity(.15))),
                 child: ListTile(
-                  onTap: () {},
+                  onTap: () {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(item.$2),
+      content: const Text('Menu siap digunakan.'),
+    ),
+  );
+},
                   leading: Icon(item.$1, color: const Color(0xFF9B7637)),
                   title: Text(item.$2,
                       style: const TextStyle(
