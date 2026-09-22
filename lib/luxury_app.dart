@@ -40,7 +40,7 @@ class GlobalAppState {
         type: 'gift',
         amount: -100000,
         timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-        description: 'Kirim Gift Diamond 💎',
+        description: 'Kirim Gift Diamond ð',
       ),
       Transaction(
         type: 'recharge',
@@ -58,7 +58,7 @@ class GlobalAppState {
         type: 'gift',
         amount: -50000,
         timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        description: 'Kirim Gift Rose 🌹',
+        description: 'Kirim Gift Rose ð¹',
       ),
     ]);
   }
@@ -177,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 7),
               const Text(
-                'REAL VOICES  •  REAL PEOPLE',
+                'REAL VOICES  â¢  REAL PEOPLE',
                 style: TextStyle(
                   fontSize: 11,
                   letterSpacing: 1.8,
@@ -315,8 +315,8 @@ class _HomePageState extends State<HomePage> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.mic_none),
-            activeIcon: Icon(Icons.mic),
+            icon: Icon(Icons.meeting_room_outlined),
+            activeIcon: Icon(Icons.meeting_room_rounded),
             label: 'Room',
           ),
           BottomNavigationBarItem(
@@ -346,7 +346,7 @@ class _HomePageState extends State<HomePage> {
       case 1:
         return const _PartyContent();
       case 2:
-        return const _InboxContent();
+        return const _FamilyContent();
       case 3:
         return const WalletPage();
       case 4:
@@ -420,7 +420,7 @@ class _HomeContent extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Good evening 👋',
+              Text('Good evening ð',
                   style: TextStyle(color: muted, fontSize: 11)),
               SizedBox(height: 2),
               Text('CUAN PARTY',
@@ -684,7 +684,7 @@ class _HomeContent extends StatelessWidget {
             title: Text(room.$1,
                 style: const TextStyle(
                     color: brown, fontWeight: FontWeight.w800, fontSize: 14)),
-            subtitle: Text('${room.$2}  •  ${room.$3} online',
+            subtitle: Text('${room.$2}  â¢  ${room.$3} online',
                 style: const TextStyle(color: muted, fontSize: 11)),
             trailing: const Icon(Icons.chevron_right_rounded, color: goldDark),
           ),
@@ -736,34 +736,204 @@ class _HomeContent extends StatelessWidget {
 class _PartyContent extends StatelessWidget {
   const _PartyContent();
 
+  static const ivory = Color(0xFFF7F1E7);
+  static const cream = Color(0xFFFFFBF5);
+  static const gold = Color(0xFFC8A45D);
+  static const goldDark = Color(0xFF9B7637);
+  static const brown = Color(0xFF4A3525);
+  static const muted = Color(0xFF8B7A68);
+
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Party Discovery',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFC8A45D),
-        ),
+    final rooms = [
+      ('Royal Lounge', 'Official Room', '2.5K', Icons.auto_awesome),
+      ('Sweet Talk', 'Maya', '1.8K', Icons.favorite_rounded),
+      ('Music Zone', 'Dion', '1.2K', Icons.music_note_rounded),
+      ('Night Talk', 'QueenA', '2.1K', Icons.mic_rounded),
+    ];
+
+    return Container(
+      color: ivory,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        children: [
+          const Text('Voice Room',
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: brown)),
+          const SizedBox(height: 4),
+          const Text('Join a room and start talking',
+              style: TextStyle(color: muted, fontSize: 12)),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cream,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: gold.withOpacity(.2)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.graphic_eq_rounded, color: goldDark, size: 30),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text('Live Voice Rooms',
+                      style: TextStyle(color: brown, fontWeight: FontWeight.w900, fontSize: 16)),
+                ),
+                Icon(Icons.chevron_right_rounded, color: goldDark),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...rooms.map((room) => Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: cream,
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: gold.withOpacity(.17)),
+                ),
+                child: ListTile(
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => RoomPage(
+                      roomName: room.$1,
+                      hostName: room.$2,
+                      userCount: room.$3,
+                    ),
+                  )),
+                  leading: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE8D2A3), Color(0xFFC39A53)],
+                      ),
+                    ),
+                    child: Icon(room.$4, color: cream),
+                  ),
+                  title: Text(room.$1,
+                      style: const TextStyle(color: brown, fontWeight: FontWeight.w800)),
+                  subtitle: Text('${room.$2} â¢ ${room.$3} online',
+                      style: const TextStyle(color: muted, fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: goldDark),
+                ),
+              )),
+        ],
       ),
     );
   }
 }
 
-class _InboxContent extends StatelessWidget {
-  const _InboxContent();
+class _FamilyContent extends StatelessWidget {
+  const _FamilyContent();
+
+  static const ivory = Color(0xFFF7F1E7);
+  static const cream = Color(0xFFFFFBF5);
+  static const gold = Color(0xFFC8A45D);
+  static const goldDark = Color(0xFF9B7637);
+  static const brown = Color(0xFF4A3525);
+  static const muted = Color(0xFF8B7A68);
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Inbox',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFC8A45D),
-        ),
+    return Container(
+      color: ivory,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        children: [
+          const Text('Family',
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: brown)),
+          const SizedBox(height: 4),
+          const Text('Your community, your circle',
+              style: TextStyle(color: muted, fontSize: 12)),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEBD6A3), Color(0xFFC69B56)],
+              ),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: gold.withOpacity(.35)),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.groups_rounded, color: cream, size: 38),
+                SizedBox(height: 12),
+                Text('Royal Family',
+                    style: TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.w900)),
+                SizedBox(height: 5),
+                Text('128 members â¢ Active today',
+                    style: TextStyle(color: Color(0xFFF7EEDF), fontSize: 11)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _FamilyAction(icon: Icons.person_add_alt_1_rounded, label: 'Members')),
+              const SizedBox(width: 10),
+              Expanded(child: _FamilyAction(icon: Icons.emoji_events_rounded, label: 'Ranking')),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const Text('Family Activity',
+              style: TextStyle(color: brown, fontSize: 17, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          ...[
+            ('CICI BIGBOSS', 'Sent 50,000 gifts'),
+            ('GARRA', 'Joined Royal Lounge'),
+            ('QueenA', 'Reached VIP level'),
+          ].map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                decoration: BoxDecoration(
+                  color: cream,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: gold.withOpacity(.15)),
+                ),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFD2AE67),
+                    child: Icon(Icons.person_rounded, color: cream),
+                  ),
+                  title: Text(item.$1,
+                      style: const TextStyle(color: brown, fontWeight: FontWeight.w800)),
+                  subtitle: Text(item.$2,
+                      style: const TextStyle(color: muted, fontSize: 11)),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _FamilyAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _FamilyAction({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 72,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.18)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: const Color(0xFF9B7637), size: 24),
+          const SizedBox(height: 5),
+          Text(label,
+              style: const TextStyle(
+                color: Color(0xFF4A3525),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              )),
+        ],
       ),
     );
   }
@@ -851,12 +1021,31 @@ class _ProfileContent extends StatelessWidget {
                     border: Border.all(color: gold.withOpacity(.15))),
                 child: ListTile(
                   onTap: () {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(item.$2),
-      content: const Text('Menu siap digunakan.'),
-    ),
+  Widget page;
+  switch (item.$2) {
+    case 'Inventory / Bag':
+      page = const InventoryPage();
+      break;
+    case 'Frames':
+      page = const FramesPage();
+      break;
+    case 'Badges':
+      page = const BadgesPage();
+      break;
+    case 'VIP / SVIP':
+      page = const VipPage();
+      break;
+    case 'My Ranking':
+      page = const MyRankingPage();
+      break;
+    case 'Settings':
+      page = const SettingsPage();
+      break;
+    default:
+      page = const SettingsPage();
+  }
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => page),
   );
 },
                   leading: Icon(item.$1, color: const Color(0xFF9B7637)),
@@ -972,13 +1161,13 @@ class _WalletPageState extends State<WalletPage> {
   String _getTransactionIcon(String type) {
     switch (type) {
       case 'recharge':
-        return '💰';
+        return 'ð°';
       case 'gift':
-        return '🎁';
+        return 'ð';
       case 'earn':
-        return '⭐';
+        return 'â­';
       default:
-        return '💱';
+        return 'ð±';
     }
   }
 
@@ -1054,13 +1243,13 @@ class _WalletPageState extends State<WalletPage> {
                             'Total Balance',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white70,
+                              color: Color(0xFF8B7A68),
                               letterSpacing: 0.5,
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            '💰 ${_formatCurrency(_coinBalance)}',
+                            'ð° ${_formatCurrency(_coinBalance)}',
                             style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w900,
@@ -1073,7 +1262,7 @@ class _WalletPageState extends State<WalletPage> {
                             'COIN',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white54,
+                              color: Color(0xFF8B7A68),
                               letterSpacing: 2,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1235,7 +1424,7 @@ class _WalletPageState extends State<WalletPage> {
                                                 style: const TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w700,
-                                                  color: Colors.white,
+                                                  color: Color(0xFF4A3525),
                                                   letterSpacing: 0.2,
                                                 ),
                                                 maxLines: 1,
@@ -1243,11 +1432,11 @@ class _WalletPageState extends State<WalletPage> {
                                               ),
                                               const SizedBox(height: 5),
                                               Text(
-                                                DateFormat('dd MMM yyyy • HH:mm', 'id_ID')
+                                                DateFormat('dd MMM yyyy â¢ HH:mm', 'id_ID')
                                                     .format(transaction.timestamp),
                                                 style: const TextStyle(
                                                   fontSize: 11,
-                                                  color: Colors.white60,
+                                                  color: Color(0xFF8B7A68),
                                                   letterSpacing: 0.3,
                                                 ),
                                               ),
@@ -1315,14 +1504,14 @@ class _WalletPageState extends State<WalletPage> {
                             Icon(
                               Icons.receipt_long_outlined,
                               size: 48,
-                              color: Colors.white30,
+                              color: Color(0xFFB9AA98),
                             ),
                             const SizedBox(height: 12),
                             const Text(
                               'No transactions yet',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white54,
+                                color: Color(0xFF8B7A68),
                               ),
                             ),
                           ],
@@ -1377,7 +1566,7 @@ class _WalletPageState extends State<WalletPage> {
                             },
                             child: const Icon(
                               Icons.close,
-                              color: Colors.white54,
+                              color: Color(0xFF8B7A68),
                               size: 24,
                             ),
                           ),
@@ -1389,7 +1578,7 @@ class _WalletPageState extends State<WalletPage> {
                         'Jumlah Coin',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white70,
+                          color: Color(0xFF8B7A68),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -1405,18 +1594,18 @@ class _WalletPageState extends State<WalletPage> {
                           controller: _rechargeController,
                           keyboardType: TextInputType.number,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFF4A3525),
                             fontSize: 16,
                           ),
                           decoration: InputDecoration(
                             hintText: 'Masukkan jumlah...',
                             hintStyle: const TextStyle(
-                              color: Colors.white54,
+                              color: Color(0xFF8B7A68),
                             ),
                             prefixIcon: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 12),
                               child: Text(
-                                '💰',
+                                'ð°',
                                 style: TextStyle(fontSize: 20),
                               ),
                             ),
@@ -1438,7 +1627,7 @@ class _WalletPageState extends State<WalletPage> {
                         'Quick Select',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white70,
+                          color: Color(0xFF8B7A68),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -1568,12 +1757,12 @@ class _RoomPageState extends State<RoomPage> {
 
   // Gift data with price in coins
   final List<Map<String, dynamic>> _gifts = [
-    {'name': 'Rose 🌹', 'emoji': '🌹', 'price': 10000, 'displayPrice': '10k'},
-    {'name': 'Heart ❤️', 'emoji': '❤️', 'price': 25000, 'displayPrice': '25k'},
-    {'name': 'Diamond 💎', 'emoji': '💎', 'price': 50000, 'displayPrice': '50k'},
-    {'name': 'Ring 💍', 'emoji': '💍', 'price': 100000, 'displayPrice': '100k'},
-    {'name': 'Crown 👑', 'emoji': '👑', 'price': 250000, 'displayPrice': '250k'},
-    {'name': 'Rocket 🚀', 'emoji': '🚀', 'price': 500000, 'displayPrice': '500k'},
+    {'name': 'Rose ð¹', 'emoji': 'ð¹', 'price': 10000, 'displayPrice': '10k'},
+    {'name': 'Heart â¤ï¸', 'emoji': 'â¤ï¸', 'price': 25000, 'displayPrice': '25k'},
+    {'name': 'Diamond ð', 'emoji': 'ð', 'price': 50000, 'displayPrice': '50k'},
+    {'name': 'Ring ð', 'emoji': 'ð', 'price': 100000, 'displayPrice': '100k'},
+    {'name': 'Crown ð', 'emoji': 'ð', 'price': 250000, 'displayPrice': '250k'},
+    {'name': 'Rocket ð', 'emoji': 'ð', 'price': 500000, 'displayPrice': '500k'},
   ];
 
   @override
@@ -2196,6 +2385,464 @@ class _RoomPageState extends State<RoomPage> {
               fontWeight: FontWeight.w600,
               color: isExit ? Colors.red : const Color(0xFFC8A45D),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _LuxurySubPage extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _LuxurySubPage({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F1E7),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF7F1E7),
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF9B7637)),
+        ),
+        title: Text(title,
+            style: const TextStyle(
+              color: Color(0xFF4A3525),
+              fontWeight: FontWeight.w900,
+            )),
+        centerTitle: true,
+      ),
+      body: child,
+    );
+  }
+}
+
+class InventoryPage extends StatelessWidget {
+  const InventoryPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.card_giftcard_rounded, 'Gifts', '18 items'),
+      (Icons.auto_awesome_rounded, 'Frames', '4 owned'),
+      (Icons.workspace_premium_rounded, 'Badges', '6 owned'),
+      (Icons.inventory_2_outlined, 'Other Items', '3 items'),
+    ];
+
+    return _LuxurySubPage(
+      title: 'Inventory / Bag',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: items.map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBF5),
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.18)),
+          ),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFFF2E7D7),
+              child: Icon(item.$1, color: const Color(0xFF9B7637)),
+            ),
+            title: Text(item.$2,
+                style: const TextStyle(color: Color(0xFF4A3525), fontWeight: FontWeight.w800)),
+            subtitle: Text(item.$3,
+                style: const TextStyle(color: Color(0xFF8B7A68), fontSize: 11)),
+            trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF9B7637)),
+          ),
+        )).toList(),
+      ),
+    );
+  }
+}
+
+class FramesPage extends StatefulWidget {
+  const FramesPage({super.key});
+
+  @override
+  State<FramesPage> createState() => _FramesPageState();
+}
+
+class _FramesPageState extends State<FramesPage> {
+  int equipped = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final frames = [
+      ('Royal Gold', Icons.auto_awesome_rounded),
+      ('Diamond Crown', Icons.workspace_premium_rounded),
+      ('Golden Wings', Icons.flight_rounded),
+      ('Luxury Night', Icons.nightlight_round),
+    ];
+
+    return _LuxurySubPage(
+      title: 'Frames',
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: frames.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: .9,
+        ),
+        itemBuilder: (_, index) {
+          final selected = equipped == index;
+          return GestureDetector(
+            onTap: () => setState(() => equipped = index),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFFC8A45D)
+                      : const Color(0xFFC8A45D).withOpacity(.16),
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFEBD6A3), Color(0xFFC39A53)],
+                      ),
+                      border: Border.all(color: const Color(0xFFC8A45D), width: 3),
+                    ),
+                    child: Icon(frames[index].$2, color: const Color(0xFFFFFBF5), size: 42),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(frames[index].$1,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF4A3525),
+                        fontWeight: FontWeight.w800,
+                      )),
+                  const SizedBox(height: 7),
+                  Text(selected ? 'EQUIPPED' : 'Tap to equip',
+                      style: TextStyle(
+                        color: selected
+                            ? const Color(0xFF9B7637)
+                            : const Color(0xFF8B7A68),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      )),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class BadgesPage extends StatelessWidget {
+  const BadgesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final badges = [
+      ('VIP Member', Icons.workspace_premium_rounded),
+      ('Top Gifter', Icons.card_giftcard_rounded),
+      ('Room Star', Icons.star_rounded),
+      ('Event Winner', Icons.emoji_events_rounded),
+      ('Family Hero', Icons.groups_rounded),
+      ('Early User', Icons.bolt_rounded),
+    ];
+
+    return _LuxurySubPage(
+      title: 'Badges',
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: badges.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.05,
+        ),
+        itemBuilder: (_, index) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBF5),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.18)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(badges[index].$2, color: const Color(0xFFC8A45D), size: 42),
+              const SizedBox(height: 10),
+              Text(badges[index].$1,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF4A3525),
+                    fontWeight: FontWeight.w800,
+                  )),
+              const SizedBox(height: 4),
+              const Text('OWNED',
+                  style: TextStyle(
+                    color: Color(0xFF9B7637),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class VipPage extends StatelessWidget {
+  const VipPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _LuxurySubPage(
+      title: 'VIP / SVIP',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEBD6A3), Color(0xFFC69B56)],
+              ),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('VIP 3',
+                    style: TextStyle(
+                      color: Color(0xFFFFFBF5),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    )),
+                SizedBox(height: 6),
+                Text('Current membership',
+                    style: TextStyle(color: Color(0xFFF7EEDF), fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _VipBenefit(icon: Icons.auto_awesome, text: 'Exclusive VIP badge'),
+          _VipBenefit(icon: Icons.card_giftcard, text: 'Special gift access'),
+          _VipBenefit(icon: Icons.palette_outlined, text: 'Premium profile style'),
+          _VipBenefit(icon: Icons.star_outline, text: 'Priority room presence'),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF5),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.18)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.workspace_premium_rounded, color: Color(0xFF9B7637), size: 30),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text('Next: SVIP',
+                      style: TextStyle(
+                        color: Color(0xFF4A3525),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      )),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Color(0xFF9B7637)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VipBenefit extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _VipBenefit({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF5),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFFC8A45D)),
+          const SizedBox(width: 12),
+          Text(text,
+              style: const TextStyle(
+                color: Color(0xFF4A3525),
+                fontWeight: FontWeight.w700,
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class MyRankingPage extends StatelessWidget {
+  const MyRankingPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ranking = [
+      ('CICI BIGBOSS', '82,450,000'),
+      ('GARRA', '71,200,000'),
+      ('QueenA', '65,900,000'),
+      ('CUAN USER', '54,800,000'),
+      ('Nana', '49,700,000'),
+    ];
+
+    return _LuxurySubPage(
+      title: 'My Ranking',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF5),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.2)),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.emoji_events_rounded, color: Color(0xFFC8A45D), size: 48),
+                SizedBox(height: 8),
+                Text('#28',
+                    style: TextStyle(
+                      color: Color(0xFF4A3525),
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                    )),
+                Text('Your current ranking',
+                    style: TextStyle(color: Color(0xFF8B7A68), fontSize: 11)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...ranking.asMap().entries.map((entry) {
+            final i = entry.key;
+            final item = entry.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF5),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.14)),
+              ),
+              child: Row(
+                children: [
+                  Text('#${i + 1}',
+                      style: const TextStyle(
+                        color: Color(0xFF9B7637),
+                        fontWeight: FontWeight.w900,
+                      )),
+                  const SizedBox(width: 13),
+                  const CircleAvatar(
+                    radius: 19,
+                    backgroundColor: Color(0xFFD2AE67),
+                    child: Icon(Icons.person_rounded, color: Color(0xFFFFFBF5), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(item.$1,
+                        style: const TextStyle(
+                          color: Color(0xFF4A3525),
+                          fontWeight: FontWeight.w800,
+                        )),
+                  ),
+                  Text(item.$2,
+                      style: const TextStyle(
+                        color: Color(0xFF9B7637),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      )),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.person_outline_rounded, 'Account'),
+      (Icons.notifications_none_rounded, 'Notifications'),
+      (Icons.lock_outline_rounded, 'Privacy'),
+      (Icons.language_rounded, 'Language'),
+      (Icons.info_outline_rounded, 'About'),
+    ];
+
+    return _LuxurySubPage(
+      title: 'Settings',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ...items.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBF5),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: const Color(0xFFC8A45D).withOpacity(.15)),
+                ),
+                child: ListTile(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${item.$2} siap digunakan')),
+                    );
+                  },
+                  leading: Icon(item.$1, color: const Color(0xFF9B7637)),
+                  title: Text(item.$2,
+                      style: const TextStyle(
+                        color: Color(0xFF4A3525),
+                        fontWeight: FontWeight.w700,
+                      )),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF8B7A68)),
+                ),
+              )),
+          const SizedBox(height: 10),
+          const Center(
+            child: Text('CUAN PARTY â¢ V1',
+                style: TextStyle(
+                  color: Color(0xFF8B7A68),
+                  fontSize: 10,
+                  letterSpacing: 1,
+                )),
           ),
         ],
       ),
