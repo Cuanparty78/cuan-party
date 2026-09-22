@@ -83,12 +83,12 @@ class CuanPartyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'CUAN PARTY',
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF090909),
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF7F1E7),
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4AF37),
-          brightness: Brightness.dark,
+          seedColor: const Color(0xFFC8A45D),
+          brightness: Brightness.light,
         ),
         useMaterial3: true,
       ),
@@ -120,20 +120,9 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    if (_phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Masukkan nomor HP Anda'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
+  void _enterApp() {
     setState(() => _isLoading = true);
-
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomePage()),
@@ -142,296 +131,152 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  void _handleRegister() {
-    if (_phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Masukkan nomor HP Anda'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pendaftaran berhasil! Silahkan masuk.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _phoneController.clear();
-        setState(() => _isLoading = false);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
+
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF1a1410),
-              const Color(0xFF0f0d0a),
-              const Color(0xFF0d0a07),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 40),
-                // Logo & Brand
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFFD4AF37).withOpacity(0.3),
-                        const Color(0xFFD4AF37).withOpacity(0.1),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: const Color(0xFFD4AF37),
-                      width: 2,
-                    ),
+      backgroundColor: const Color(0xFFF7F1E7),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(26, 28, 26, 22),
+          child: Column(
+            children: [
+              const SizedBox(height: 18),
+              Container(
+                width: 104,
+                height: 104,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFE9D6A8), Color(0xFFC39A53)],
                   ),
-                  child: const Icon(
-                    Icons.mic_rounded,
-                    size: 60,
-                    color: Color(0xFFD4AF37),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                // Title
-                const Text(
-                  'CUAN PARTY',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
-                    color: Color(0xFFD4AF37),
-                    shadows: [
-                      Shadow(
-                        offset: Offset(0, 4),
-                        blurRadius: 12,
-                        color: Color(0xFFD4AF37),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'CONNECT • PARTY • EARN',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 2.5,
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 56),
-                // Phone Input
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFD4AF37).withOpacity(0.3),
-                      width: 1.5,
-                    ),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF1a1410).withOpacity(0.8),
-                        const Color(0xFF0f0d0a).withOpacity(0.6),
-                      ],
-                    ),
-                  ),
-                  child: TextField(
-                    controller: _phoneController,
-                    enabled: !_isLoading,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Masukkan Nomor HP',
-                      hintStyle: TextStyle(
-                        color: Colors.white54,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Icon(
-                          Icons.phone_rounded,
-                          color: Color(0xFFD4AF37),
-                          size: 22,
-                        ),
-                      ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 0,
-                        minHeight: 0,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 18,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                // Login Button
-                AnimatedOpacity(
-                  opacity: _isLoading ? 0.6 : 1.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Container(
-                    width: double.infinity,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFFD4AF37),
-                          const Color(0xFFC19A1B),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          offset: const Offset(0, 8),
-                          blurRadius: 20,
-                          color: const Color(0xFFD4AF37).withOpacity(0.4),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _isLoading ? null : _handleLogin,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Center(
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Color(0xFF090909),
-                                    strokeWidth: 3,
-                                  ),
-                                )
-                              : const Text(
-                                  'MASUK',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.5,
-                                    color: Color(0xFF090909),
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Register Button
-                AnimatedOpacity(
-                  opacity: _isLoading ? 0.6 : 1.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Container(
-                    width: double.infinity,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFFD4AF37),
-                        width: 2,
-                      ),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _isLoading ? null : _handleRegister,
-                        borderRadius: BorderRadius.circular(16),
-                        child: const Center(
-                          child: Text(
-                            'DAFTAR',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5,
-                              color: Color(0xFFD4AF37),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 48),
-                // Bottom Info
-                Column(
-                  children: [
-                    Text(
-                      'Dengan masuk, Anda menyetujui',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white54,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Syarat & Ketentuan',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: const Color(0xFFD4AF37),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                        Text(
-                          ' dan ',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white54,
-                          ),
-                        ),
-                        Text(
-                          'Kebijakan Privasi',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: const Color(0xFFD4AF37),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ],
+                  border: Border.all(color: const Color(0xFFFFFBF5), width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFC8A45D).withOpacity(.28),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
+                child: const Icon(Icons.mic_rounded, size: 48,
+                    color: Color(0xFFFFFBF5)),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'CUAN PARTY',
+                style: TextStyle(
+                  fontSize: 29,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.5,
+                  color: Color(0xFF4A3525),
+                ),
+              ),
+              const SizedBox(height: 7),
+              const Text(
+                'REAL VOICES  •  REAL PEOPLE',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 1.8,
+                  color: Color(0xFF8B7A68),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Text(
+                'A BETTER YOU',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 2.4,
+                  color: Color(0xFF9B7637),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 38),
+              _socialButton(Icons.g_mobiledata_rounded, 'Continue with Google'),
+              if (isIOS) ...[
+                const SizedBox(height: 12),
+                _socialButton(Icons.apple, 'Continue with Apple'),
               ],
-            ),
+              const SizedBox(height: 12),
+              _socialButton(Icons.phone_rounded, 'Continue with Phone'),
+              const SizedBox(height: 27),
+              Row(
+                children: [
+                  Expanded(child: Divider(
+                      color: const Color(0xFFC8A45D).withOpacity(.35))),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('or login with',
+                        style: TextStyle(
+                            color: Color(0xFF8B7A68), fontSize: 11)),
+                  ),
+                  Expanded(child: Divider(
+                      color: const Color(0xFFC8A45D).withOpacity(.35))),
+                ],
+              ),
+              const SizedBox(height: 17),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _miniSocial(Icons.facebook),
+                  _miniSocial(Icons.music_note_rounded),
+                  _miniSocial(Icons.chat_bubble_rounded),
+                ],
+              ),
+              const SizedBox(height: 30),
+              const Text(
+                'By continuing, you agree to our Terms of Service and Privacy Policy.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: Color(0xFF8B7A68), fontSize: 10, height: 1.5),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _socialButton(IconData icon, String label) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: OutlinedButton.icon(
+        onPressed: _isLoading ? null : _enterApp,
+        icon: Icon(icon, color: const Color(0xFF4A3525), size: 22),
+        label: Text(label,
+            style: const TextStyle(
+                color: Color(0xFF4A3525), fontWeight: FontWeight.w700)),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: const Color(0xFFFFFBF5),
+          side: BorderSide(
+              color: const Color(0xFFC8A45D).withOpacity(.45)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniSocial(IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: InkWell(
+        onTap: _enterApp,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFFFFBF5),
+            border: Border.all(
+                color: const Color(0xFFC8A45D).withOpacity(.35)),
+          ),
+          child: Icon(icon, color: const Color(0xFF9B7637), size: 20),
         ),
       ),
     );
@@ -459,9 +304,9 @@ class _HomePageState extends State<HomePage> {
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
-        backgroundColor: const Color(0xFF0E0E0E),
-        selectedItemColor: const Color(0xFFD4AF37),
-        unselectedItemColor: Colors.white54,
+        backgroundColor: const Color(0xFFFFFBF5),
+        selectedItemColor: const Color(0xFF9B7637),
+        unselectedItemColor: const Color(0xFF9A8B7A),
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
@@ -472,17 +317,17 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.mic_none),
             activeIcon: Icon(Icons.mic),
-            label: 'Party',
+            label: 'Room',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            activeIcon: Icon(Icons.chat_bubble),
-            label: 'Inbox',
+            icon: Icon(Icons.groups_outlined),
+            activeIcon: Icon(Icons.groups),
+            label: 'Family',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events_outlined),
-            activeIcon: Icon(Icons.emoji_events),
-            label: 'Rank',
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            activeIcon: Icon(Icons.account_balance_wallet),
+            label: 'Wallet',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
@@ -503,7 +348,7 @@ class _HomePageState extends State<HomePage> {
       case 2:
         return const _InboxContent();
       case 3:
-        return const _RankingContent();
+        return const WalletPage();
       case 4:
         return const _ProfileContent();
       default:
@@ -515,37 +360,38 @@ class _HomePageState extends State<HomePage> {
 class _HomeContent extends StatelessWidget {
   const _HomeContent();
 
-  static const gold = Color(0xFFD7B35A);
-  static const champagne = Color(0xFFF4E6C5);
-  static const brown = Color(0xFF2A1B12);
-  static const darkBrown = Color(0xFF120C08);
-  static const silver = Color(0xFFD8D8D8);
+  static const ivory = Color(0xFFF7F1E7);
+  static const cream = Color(0xFFFFFBF5);
+  static const gold = Color(0xFFC8A45D);
+  static const goldDark = Color(0xFF9B7637);
+  static const brown = Color(0xFF4A3525);
+  static const muted = Color(0xFF8B7A68);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: darkBrown,
+      color: ivory,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
         children: [
           _header(context),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           _search(),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           _heroBanner(),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           _quickMenu(context),
-          const SizedBox(height: 24),
+          const SizedBox(height: 23),
           _sectionTitle('Recommended Rooms', 'See All'),
-          const SizedBox(height: 12),
+          const SizedBox(height: 11),
           _roomRow(context),
           const SizedBox(height: 22),
-          _sectionTitle('Popular Now', 'See All'),
-          const SizedBox(height: 12),
+          _sectionTitle('Live Now', 'See All'),
+          const SizedBox(height: 11),
           _roomList(context),
           const SizedBox(height: 22),
           _sectionTitle('Family & Event', 'More'),
-          const SizedBox(height: 12),
+          const SizedBox(height: 11),
           _familyEventCards(),
         ],
       ),
@@ -556,188 +402,164 @@ class _HomeContent extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: brown,
-            border: Border.all(color: gold, width: 1.5),
+            gradient: const LinearGradient(
+                colors: [Color(0xFFE9D6A8), Color(0xFFC39A53)]),
+            border: Border.all(color: cream, width: 2),
             boxShadow: [
-              BoxShadow(
-                color: gold.withOpacity(.18),
-                blurRadius: 14,
-              ),
+              BoxShadow(color: gold.withOpacity(.20), blurRadius: 12)
             ],
           ),
-          child: const Icon(Icons.person_rounded, color: champagne, size: 25),
+          child: const Icon(Icons.person_rounded, color: cream, size: 24),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 11),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Good evening 👋',
-                style: TextStyle(
-                  color: silver,
-                  fontSize: 12,
-                ),
-              ),
+              Text('Good evening 👋',
+                  style: TextStyle(color: muted, fontSize: 11)),
               SizedBox(height: 2),
-              Text(
-                'CUAN PARTY',
-                style: TextStyle(
-                  color: champagne,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
+              Text('CUAN PARTY',
+                  style: TextStyle(
+                      color: brown,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1)),
             ],
           ),
         ),
-        _iconButton(
-          Icons.account_balance_wallet_outlined,
-          () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const WalletPage()),
-          ),
-        ),
-        const SizedBox(width: 8),
+        _iconButton(Icons.search_rounded, () {}),
+        const SizedBox(width: 7),
         _iconButton(Icons.notifications_none_rounded, () {}),
       ],
     );
   }
 
-  Widget _iconButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 43,
-        height: 43,
+  Widget _iconButton(IconData icon, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+              color: cream,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: gold.withOpacity(.25))),
+          child: Icon(icon, color: brown, size: 19),
+        ),
+      );
+
+  Widget _search() => Container(
+        height: 46,
         decoration: BoxDecoration(
-          color: brown,
+          color: cream,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: gold.withOpacity(.35)),
+          border: Border.all(color: gold.withOpacity(.22)),
         ),
-        child: Icon(icon, color: gold, size: 20),
-      ),
-    );
-  }
+        child: const TextField(
+          style: TextStyle(color: brown),
+          decoration: InputDecoration(
+            hintText: 'Search rooms, people or family',
+            hintStyle: TextStyle(color: muted, fontSize: 12),
+            prefixIcon: Icon(Icons.search_rounded, color: goldDark),
+            border: InputBorder.none,
+          ),
+        ),
+      );
 
-  Widget _search() {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B110B),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: gold.withOpacity(.18)),
-      ),
-      child: const TextField(
-        style: TextStyle(color: champagne),
-        decoration: InputDecoration(
-          hintText: 'Search room, family, or user',
-          hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
-          prefixIcon: Icon(Icons.search_rounded, color: gold),
-          border: InputBorder.none,
+  Widget _heroBanner() => Container(
+        height: 176,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(23),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFEBD6A3), Color(0xFFC69B56)],
+          ),
+          border: Border.all(color: const Color(0xFFB68A47).withOpacity(.5)),
+          boxShadow: [
+            BoxShadow(color: gold.withOpacity(.18), blurRadius: 18, offset: const Offset(0, 7))
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _heroBanner() {
-    return Container(
-      height: 154,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF5A3A1D), Color(0xFF1A0F09)],
-        ),
-        border: Border.all(color: gold.withOpacity(.55)),
-        boxShadow: [
-          BoxShadow(color: gold.withOpacity(.10), blurRadius: 20),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -8,
-            top: -22,
-            child: Icon(
-              Icons.workspace_premium_rounded,
-              size: 125,
-              color: gold.withOpacity(.12),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Real Voices',
+                      style: TextStyle(
+                          color: cream,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900)),
+                  Text('Real Connections',
+                      style: TextStyle(
+                          color: cream,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700)),
+                  SizedBox(height: 9),
+                  Text('Meet new people. Join a room. Find your circle.',
+                      style: TextStyle(
+                          color: Color(0xFFF7EEDF),
+                          fontSize: 11,
+                          height: 1.35)),
+                ],
+              ),
             ),
-          ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'MORE THAN A VOICE',
-                style: TextStyle(
-                  color: gold,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                ),
+            Container(
+              width: 92,
+              height: 128,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                color: cream.withOpacity(.22),
+                border: Border.all(color: cream.withOpacity(.55)),
               ),
-              SizedBox(height: 9),
-              Text(
-                'Find Your Voice\nFind Your People',
-                style: TextStyle(
-                  color: champagne,
-                  fontSize: 23,
-                  height: 1.05,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Good voice • Good people • Brighter together',
-                style: TextStyle(color: Colors.white60, fontSize: 11),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+              child: const Icon(Icons.graphic_eq_rounded,
+                  size: 54, color: cream),
+            ),
+          ],
+        ),
+      );
 
   Widget _quickMenu(BuildContext context) {
     final items = [
-      (Icons.mic_none_rounded, 'Room', const Color(0xFFD7B35A)),
-      (Icons.groups_rounded, 'Family', const Color(0xFFD8D8D8)),
-      (Icons.videogame_asset_rounded, 'Game', const Color(0xFFD7B35A)),
-      (Icons.card_giftcard_rounded, 'Gift', const Color(0xFFE5C98A)),
-      (Icons.emoji_events_rounded, 'Rank', const Color(0xFFD8D8D8)),
-      (Icons.event_rounded, 'Event', const Color(0xFFD7B35A)),
+      (Icons.mic_none_rounded, 'Popular'),
+      (Icons.videogame_asset_rounded, 'Game'),
+      (Icons.event_rounded, 'Event'),
+      (Icons.emoji_events_rounded, 'Ranking'),
+      (Icons.groups_rounded, 'Family'),
     ];
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: items.map((item) {
         return Expanded(
-          child: GestureDetector(
+          child: InkWell(
             onTap: () {},
+            borderRadius: BorderRadius.circular(15),
             child: Column(
               children: [
                 Container(
-                  width: 45,
-                  height: 45,
+                  width: 47,
+                  height: 47,
                   decoration: BoxDecoration(
-                    color: brown,
                     shape: BoxShape.circle,
+                    color: cream,
                     border: Border.all(color: gold.withOpacity(.28)),
                   ),
-                  child: Icon(item.$1, color: item.$3, size: 21),
+                  child: Icon(item.$1, color: goldDark, size: 21),
                 ),
-                const SizedBox(height: 7),
-                Text(
-                  item.$2,
-                  style: const TextStyle(color: champagne, fontSize: 10),
-                ),
+                const SizedBox(height: 6),
+                Text(item.$2,
+                    style: const TextStyle(
+                        color: brown,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -746,25 +568,16 @@ class _HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _sectionTitle(String title, String action) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: champagne,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          action,
-          style: const TextStyle(color: gold, fontSize: 11),
-        ),
-      ],
-    );
-  }
+  Widget _sectionTitle(String title, String action) => Row(
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  color: brown, fontSize: 17, fontWeight: FontWeight.w900)),
+          const Spacer(),
+          Text(action,
+              style: const TextStyle(color: goldDark, fontSize: 11)),
+        ],
+      );
 
   Widget _roomRow(BuildContext context) {
     final rooms = [
@@ -772,68 +585,60 @@ class _HomeContent extends StatelessWidget {
       ('Sweet Talk', '1.8K', Icons.favorite_rounded),
       ('Music Zone', '1.2K', Icons.music_note_rounded),
     ];
-
     return SizedBox(
-      height: 136,
+      height: 150,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: rooms.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: 11),
         itemBuilder: (_, index) {
           final room = rooms[index];
-          return GestureDetector(
+          return InkWell(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => RoomPage(
-                  roomName: room.$1,
-                  hostName: 'Official Room',
-                  userCount: room.$2,
-                ),
+                    roomName: room.$1,
+                    hostName: 'Official Room',
+                    userCount: room.$2),
               ),
             ),
+            borderRadius: BorderRadius.circular(18),
             child: Container(
-              width: 142,
-              padding: const EdgeInsets.all(13),
+              width: 148,
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(19),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF4A301A), Color(0xFF21130C)],
-                ),
-                border: Border.all(color: gold.withOpacity(.35)),
+                color: cream,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: gold.withOpacity(.20)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(.035),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4))
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    height: 78,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: darkBrown,
-                      border: Border.all(color: gold),
+                      borderRadius: BorderRadius.circular(13),
+                      gradient: const LinearGradient(
+                          colors: [Color(0xFFE8D2A3), Color(0xFFD0AB69)]),
                     ),
-                    child: Icon(room.$3, color: gold),
+                    child: Center(
+                        child: Icon(room.$3, color: cream, size: 32)),
                   ),
-                  const Spacer(),
-                  Text(
-                    room.$1,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: champagne,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  const SizedBox(height: 8),
+                  Text(room.$1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: brown, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 3),
-                  Text(
-                    '♥ ${room.$2} online',
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 10,
-                    ),
-                  ),
+                  Text('${room.$2} online',
+                      style: const TextStyle(color: muted, fontSize: 10)),
                 ],
               ),
             ),
@@ -849,102 +654,83 @@ class _HomeContent extends StatelessWidget {
       ('Love Corner', 'Nana', '1.8K'),
       ('Chill Room', 'Rizky', '966'),
     ];
-
     return Column(
       children: rooms.map((room) {
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 9),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B110B),
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: gold.withOpacity(.16)),
-          ),
+              color: cream,
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: gold.withOpacity(.17))),
           child: ListTile(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RoomPage(
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => RoomPage(
                   roomName: room.$1,
                   hostName: room.$2,
-                  userCount: room.$3,
-                ),
-              ),
-            ),
+                  userCount: room.$3),
+            )),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             leading: Container(
               width: 48,
               height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: brown,
-                border: Border.all(color: gold.withOpacity(.45)),
+                gradient: const LinearGradient(
+                    colors: [Color(0xFFE8D2A3), Color(0xFFC39A53)]),
               ),
-              child: const Icon(Icons.mic_rounded, color: gold),
+              child: const Icon(Icons.mic_rounded, color: cream),
             ),
-            title: Text(
-              room.$1,
-              style: const TextStyle(
-                color: champagne,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
-            ),
-            subtitle: Text(
-              '${room.$2}  •  ${room.$3} online',
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
-            ),
-            trailing:
-                const Icon(Icons.chevron_right_rounded, color: gold),
+            title: Text(room.$1,
+                style: const TextStyle(
+                    color: brown, fontWeight: FontWeight.w800, fontSize: 14)),
+            subtitle: Text('${room.$2}  •  ${room.$3} online',
+                style: const TextStyle(color: muted, fontSize: 11)),
+            trailing: const Icon(Icons.chevron_right_rounded, color: goldDark),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _familyEventCards() {
-    return Row(
-      children: [
-        Expanded(child: _smallCard(Icons.groups_rounded, 'Family', 'Royal Family')),
-        const SizedBox(width: 10),
-        Expanded(child: _smallCard(Icons.celebration_rounded, 'Event', 'Voice Star')),
-      ],
-    );
-  }
-
-  Widget _smallCard(IconData icon, String title, String subtitle) {
-    return Container(
-      height: 92,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B110B),
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: gold.withOpacity(.18)),
-      ),
-      child: Row(
+  Widget _familyEventCards() => Row(
         children: [
-          Icon(icon, color: gold, size: 28),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: champagne, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                Text(subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 10)),
-              ],
-            ),
-          ),
+          Expanded(child: _smallCard(Icons.groups_rounded, 'Family', 'Royal Family')),
+          const SizedBox(width: 10),
+          Expanded(child: _smallCard(Icons.celebration_rounded, 'Event', 'Voice Star')),
         ],
-      ),
-    );
-  }
+      );
+
+  Widget _smallCard(IconData icon, String title, String subtitle) => Container(
+        height: 92,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+            color: cream,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: gold.withOpacity(.18))),
+        child: Row(
+          children: [
+            Icon(icon, color: goldDark, size: 28),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: brown, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: muted, fontSize: 10)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _PartyContent extends StatelessWidget {
@@ -958,7 +744,7 @@ class _PartyContent extends StatelessWidget {
         style: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w900,
-          color: Color(0xFFD4AF37),
+          color: Color(0xFFC8A45D),
         ),
       ),
     );
@@ -976,7 +762,7 @@ class _InboxContent extends StatelessWidget {
         style: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w900,
-          color: Color(0xFFD4AF37),
+          color: Color(0xFFC8A45D),
         ),
       ),
     );
@@ -994,7 +780,7 @@ class _RankingContent extends StatelessWidget {
         style: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w900,
-          color: Color(0xFFD4AF37),
+          color: Color(0xFFC8A45D),
         ),
       ),
     );
@@ -1006,14 +792,73 @@ class _ProfileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Profile',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFD4AF37),
-        ),
+    const cream = Color(0xFFFFFBF5);
+    const ivory = Color(0xFFF7F1E7);
+    const gold = Color(0xFFC8A45D);
+    const brown = Color(0xFF4A3525);
+    const muted = Color(0xFF8B7A68);
+
+    final items = [
+      (Icons.inventory_2_outlined, 'Inventory / Bag'),
+      (Icons.auto_awesome, 'Frames'),
+      (Icons.workspace_premium_outlined, 'Badges'),
+      (Icons.workspace_premium_rounded, 'VIP / SVIP'),
+      (Icons.emoji_events_outlined, 'My Ranking'),
+      (Icons.settings_outlined, 'Settings'),
+    ];
+
+    return Container(
+      color: ivory,
+      child: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Text('Profile',
+              style: TextStyle(
+                  fontSize: 26, fontWeight: FontWeight.w900, color: brown)),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cream,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: gold.withOpacity(.22)),
+            ),
+            child: const Column(
+              children: [
+                CircleAvatar(
+                  radius: 43,
+                  backgroundColor: Color(0xFFD2AE67),
+                  child: Icon(Icons.person_rounded, color: cream, size: 43),
+                ),
+                SizedBox(height: 11),
+                Text('CUAN USER',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: brown)),
+                SizedBox(height: 4),
+                Text('ID 1000001',
+                    style: TextStyle(color: muted, fontSize: 11)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          ...items.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                decoration: BoxDecoration(
+                    color: cream,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: gold.withOpacity(.15))),
+                child: ListTile(
+                  onTap: () {},
+                  leading: Icon(item.$1, color: const Color(0xFF9B7637)),
+                  title: Text(item.$2,
+                      style: const TextStyle(
+                          color: brown, fontWeight: FontWeight.w700)),
+                  trailing: const Icon(Icons.chevron_right, color: muted),
+                ),
+              )),
+        ],
       ),
     );
   }
@@ -1105,7 +950,7 @@ class _WalletPageState extends State<WalletPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Berhasil Recharge ${NumberFormat('#,##0', 'id_ID').format(amount)} Coin'),
-          backgroundColor: const Color(0xFFD4AF37).withOpacity(0.8),
+          backgroundColor: const Color(0xFFC8A45D).withOpacity(0.8),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -1139,21 +984,21 @@ class _WalletPageState extends State<WalletPage> {
             SliverAppBar(
               floating: true,
               pinned: true,
-              backgroundColor: const Color(0xFF090909),
+              backgroundColor: const Color(0xFFF7F1E7),
               leading: GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
                 child: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1a1410),
+                    color: const Color(0xFFF2E7D7),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFFD4AF37).withOpacity(0.3),
+                      color: const Color(0xFFC8A45D).withOpacity(0.3),
                     ),
                   ),
                   child: const Icon(
                     Icons.chevron_left,
-                    color: Color(0xFFD4AF37),
+                    color: Color(0xFFC8A45D),
                   ),
                 ),
               ),
@@ -1163,7 +1008,7 @@ class _WalletPageState extends State<WalletPage> {
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1,
-                  color: Color(0xFFD4AF37),
+                  color: Color(0xFFC8A45D),
                 ),
               ),
               centerTitle: true,
@@ -1185,12 +1030,12 @@ class _WalletPageState extends State<WalletPage> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            const Color(0xFFD4AF37).withOpacity(0.2),
-                            const Color(0xFFD4AF37).withOpacity(0.05),
+                            const Color(0xFFC8A45D).withOpacity(0.2),
+                            const Color(0xFFC8A45D).withOpacity(0.05),
                           ],
                         ),
                         border: Border.all(
-                          color: const Color(0xFFD4AF37).withOpacity(0.3),
+                          color: const Color(0xFFC8A45D).withOpacity(0.3),
                         ),
                       ),
                       padding: const EdgeInsets.all(24),
@@ -1211,7 +1056,7 @@ class _WalletPageState extends State<WalletPage> {
                             style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFFD4AF37),
+                              color: Color(0xFFC8A45D),
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -1246,15 +1091,15 @@ class _WalletPageState extends State<WalletPage> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              const Color(0xFFD4AF37),
-                              const Color(0xFFC19A1B),
+                              const Color(0xFFC8A45D),
+                              const Color(0xFF9B7637),
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
                               offset: const Offset(0, 8),
                               blurRadius: 20,
-                              color: const Color(0xFFD4AF37).withOpacity(0.4),
+                              color: const Color(0xFFC8A45D).withOpacity(0.4),
                             ),
                           ],
                         ),
@@ -1267,7 +1112,7 @@ class _WalletPageState extends State<WalletPage> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.5,
-                                color: Color(0xFF090909),
+                                color: Color(0xFFF7F1E7),
                               ),
                             ),
                           ),
@@ -1294,7 +1139,7 @@ class _WalletPageState extends State<WalletPage> {
                           '${_transactions.length}',
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Color(0xFFD4AF37),
+                            color: Color(0xFFC8A45D),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1309,9 +1154,9 @@ class _WalletPageState extends State<WalletPage> {
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          color: const Color(0xFF0F0D0A),
+                          color: const Color(0xFFFFFBF5),
                           border: Border.all(
-                            color: const Color(0xFFD4AF37).withOpacity(0.15),
+                            color: const Color(0xFFC8A45D).withOpacity(0.15),
                           ),
                         ),
                         child: ClipRRect(
@@ -1330,8 +1175,8 @@ class _WalletPageState extends State<WalletPage> {
                                   Container(
                                     decoration: BoxDecoration(
                                       color: index % 2 == 0
-                                          ? const Color(0xFF0F0D0A)
-                                          : const Color(0xFF1a1410).withOpacity(0.5),
+                                          ? const Color(0xFFFFFBF5)
+                                          : const Color(0xFFF2E7D7).withOpacity(0.5),
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -1349,14 +1194,14 @@ class _WalletPageState extends State<WalletPage> {
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                               colors: [
-                                                const Color(0xFFD4AF37)
+                                                const Color(0xFFC8A45D)
                                                     .withOpacity(0.2),
-                                                const Color(0xFFD4AF37)
+                                                const Color(0xFFC8A45D)
                                                     .withOpacity(0.08),
                                               ],
                                             ),
                                             border: Border.all(
-                                              color: const Color(0xFFD4AF37)
+                                              color: const Color(0xFFC8A45D)
                                                   .withOpacity(0.25),
                                             ),
                                           ),
@@ -1435,7 +1280,7 @@ class _WalletPageState extends State<WalletPage> {
                                       margin:
                                           const EdgeInsets.symmetric(horizontal: 12),
                                       height: 1,
-                                      color: const Color(0xFFD4AF37)
+                                      color: const Color(0xFFC8A45D)
                                           .withOpacity(0.08),
                                     ),
                                 ];
@@ -1451,9 +1296,9 @@ class _WalletPageState extends State<WalletPage> {
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          color: const Color(0xFF0F0D0A),
+                          color: const Color(0xFFFFFBF5),
                           border: Border.all(
-                            color: const Color(0xFFD4AF37).withOpacity(0.15),
+                            color: const Color(0xFFC8A45D).withOpacity(0.15),
                           ),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 48),
@@ -1487,14 +1332,14 @@ class _WalletPageState extends State<WalletPage> {
       bottomSheet: _showRechargeModal
           ? Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0f0d0a),
+                color: const Color(0xFFFFFBF5),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),
                 ),
                 border: Border(
                   top: BorderSide(
-                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                    color: const Color(0xFFC8A45D).withOpacity(0.2),
                   ),
                 ),
               ),
@@ -1514,7 +1359,7 @@ class _WalletPageState extends State<WalletPage> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFFD4AF37),
+                              color: Color(0xFFC8A45D),
                             ),
                           ),
                           GestureDetector(
@@ -1545,7 +1390,7 @@ class _WalletPageState extends State<WalletPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: const Color(0xFFD4AF37).withOpacity(0.3),
+                            color: const Color(0xFFC8A45D).withOpacity(0.3),
                           ),
                         ),
                         child: TextField(
@@ -1611,17 +1456,17 @@ class _WalletPageState extends State<WalletPage> {
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(
-                                        color: const Color(0xFFD4AF37)
+                                        color: const Color(0xFFC8A45D)
                                             .withOpacity(0.3),
                                       ),
-                                      color: const Color(0xFF1a1410),
+                                      color: const Color(0xFFF2E7D7),
                                     ),
                                     child: Text(
                                       _formatCurrency(amount),
                                       style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
-                                        color: Color(0xFFD4AF37),
+                                        color: Color(0xFFC8A45D),
                                       ),
                                     ),
                                   ),
@@ -1641,8 +1486,8 @@ class _WalletPageState extends State<WalletPage> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                const Color(0xFFD4AF37),
-                                const Color(0xFFC19A1B),
+                                const Color(0xFFC8A45D),
+                                const Color(0xFF9B7637),
                               ],
                             ),
                           ),
@@ -1655,7 +1500,7 @@ class _WalletPageState extends State<WalletPage> {
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1.5,
-                                  color: Color(0xFF090909),
+                                  color: Color(0xFFF7F1E7),
                                 ),
                               ),
                             ),
@@ -1675,7 +1520,7 @@ class _WalletPageState extends State<WalletPage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(0xFFD4AF37).withOpacity(0.3),
+                              color: const Color(0xFFC8A45D).withOpacity(0.3),
                             ),
                           ),
                           child: const Material(
@@ -1687,7 +1532,7 @@ class _WalletPageState extends State<WalletPage> {
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1.5,
-                                  color: Color(0xFFD4AF37),
+                                  color: Color(0xFFC8A45D),
                                 ),
                               ),
                             ),
@@ -1792,7 +1637,7 @@ class _RoomPageState extends State<RoomPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$giftEmoji Terima kasih! Anda mengirim $giftName (-${NumberFormat('#,##0', 'id_ID').format(giftPrice)} COIN)'),
-        backgroundColor: const Color(0xFFD4AF37).withOpacity(0.8),
+        backgroundColor: const Color(0xFFC8A45D).withOpacity(0.8),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -1830,7 +1675,7 @@ class _RoomPageState extends State<RoomPage> {
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFFD4AF37),
+                                color: Color(0xFFC8A45D),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1849,10 +1694,10 @@ class _RoomPageState extends State<RoomPage> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1a1410),
+                              color: const Color(0xFFF2E7D7),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFFD4AF37).withOpacity(0.3),
+                                color: const Color(0xFFC8A45D).withOpacity(0.3),
                               ),
                             ),
                             child: const Icon(
@@ -1865,7 +1710,7 @@ class _RoomPageState extends State<RoomPage> {
                       ],
                     ),
                   ),
-                  const Divider(color: Color(0xFF333333), height: 1),
+                  const Divider(color: Color(0xFFE1D4C2), height: 1),
                   // Main content area dengan 9 seats
                   Expanded(
                     child: Padding(
@@ -1896,7 +1741,7 @@ class _RoomPageState extends State<RoomPage> {
                     decoration: BoxDecoration(
                       border: Border(
                         top: BorderSide(
-                          color: const Color(0xFFD4AF37).withOpacity(0.1),
+                          color: const Color(0xFFC8A45D).withOpacity(0.1),
                         ),
                       ),
                     ),
@@ -1951,10 +1796,10 @@ class _RoomPageState extends State<RoomPage> {
                 right: 0,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0f0d0a),
+                    color: const Color(0xFFFFFBF5),
                     border: Border(
                       top: BorderSide(
-                        color: const Color(0xFFD4AF37).withOpacity(0.2),
+                        color: const Color(0xFFC8A45D).withOpacity(0.2),
                       ),
                     ),
                   ),
@@ -1967,7 +1812,7 @@ class _RoomPageState extends State<RoomPage> {
                           height: 200,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1a1410).withOpacity(0.5),
+                            color: const Color(0xFFF2E7D7).withOpacity(0.5),
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(16),
                               topRight: Radius.circular(16),
@@ -1997,15 +1842,15 @@ class _RoomPageState extends State<RoomPage> {
                                               shape: BoxShape.circle,
                                               gradient: LinearGradient(
                                                 colors: [
-                                                  const Color(0xFFD4AF37).withOpacity(0.3),
-                                                  const Color(0xFFD4AF37).withOpacity(0.1),
+                                                  const Color(0xFFC8A45D).withOpacity(0.3),
+                                                  const Color(0xFFC8A45D).withOpacity(0.1),
                                                 ],
                                               ),
                                             ),
                                             child: const Icon(
                                               Icons.person,
                                               size: 14,
-                                              color: Color(0xFFD4AF37),
+                                              color: Color(0xFFC8A45D),
                                             ),
                                           ),
                                           const SizedBox(width: 8),
@@ -2036,7 +1881,7 @@ class _RoomPageState extends State<RoomPage> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: const Color(0xFFD4AF37).withOpacity(0.3),
+                                      color: const Color(0xFFC8A45D).withOpacity(0.3),
                                     ),
                                   ),
                                   child: TextField(
@@ -2071,14 +1916,14 @@ class _RoomPageState extends State<RoomPage> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        const Color(0xFFD4AF37),
-                                        const Color(0xFFC19A1B),
+                                        const Color(0xFFC8A45D),
+                                        const Color(0xFF9B7637),
                                       ],
                                     ),
                                   ),
                                   child: const Icon(
                                     Icons.send,
-                                    color: Color(0xFF090909),
+                                    color: Color(0xFFF7F1E7),
                                     size: 18,
                                   ),
                                 ),
@@ -2099,10 +1944,10 @@ class _RoomPageState extends State<RoomPage> {
                 right: 0,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0f0d0a),
+                    color: const Color(0xFFFFFBF5),
                     border: Border(
                       top: BorderSide(
-                        color: const Color(0xFFD4AF37).withOpacity(0.2),
+                        color: const Color(0xFFC8A45D).withOpacity(0.2),
                       ),
                     ),
                   ),
@@ -2123,7 +1968,7 @@ class _RoomPageState extends State<RoomPage> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFFD4AF37),
+                                  color: Color(0xFFC8A45D),
                                 ),
                               ),
                               GestureDetector(
@@ -2142,7 +1987,7 @@ class _RoomPageState extends State<RoomPage> {
                           ),
                         ),
                         const Divider(
-                          color: Color(0xFF333333),
+                          color: Color(0xFFE1D4C2),
                           height: 1,
                         ),
                         Container(
@@ -2172,12 +2017,12 @@ class _RoomPageState extends State<RoomPage> {
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                         colors: [
-                                          const Color(0xFFD4AF37).withOpacity(0.15),
-                                          const Color(0xFFD4AF37).withOpacity(0.05),
+                                          const Color(0xFFC8A45D).withOpacity(0.15),
+                                          const Color(0xFFC8A45D).withOpacity(0.05),
                                         ],
                                       ),
                                       border: Border.all(
-                                        color: const Color(0xFFD4AF37)
+                                        color: const Color(0xFFC8A45D)
                                             .withOpacity(0.2),
                                       ),
                                     ),
@@ -2197,7 +2042,7 @@ class _RoomPageState extends State<RoomPage> {
                                           gift['displayPrice'],
                                           style: const TextStyle(
                                             fontSize: 11,
-                                            color: Color(0xFFD4AF37),
+                                            color: Color(0xFFC8A45D),
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -2234,25 +2079,25 @@ class _RoomPageState extends State<RoomPage> {
             end: Alignment.bottomRight,
             colors: isYourSeat
                 ? [
-                    const Color(0xFFD4AF37).withOpacity(0.3),
-                    const Color(0xFFD4AF37).withOpacity(0.1),
+                    const Color(0xFFC8A45D).withOpacity(0.3),
+                    const Color(0xFFC8A45D).withOpacity(0.1),
                   ]
                 : isSelected
                     ? [
-                        const Color(0xFFD4AF37).withOpacity(0.25),
-                        const Color(0xFFD4AF37).withOpacity(0.1),
+                        const Color(0xFFC8A45D).withOpacity(0.25),
+                        const Color(0xFFC8A45D).withOpacity(0.1),
                       ]
                     : [
-                        const Color(0xFF1a1410).withOpacity(0.5),
-                        const Color(0xFF0f0d0a).withOpacity(0.3),
+                        const Color(0xFFF2E7D7).withOpacity(0.5),
+                        const Color(0xFFFFFBF5).withOpacity(0.3),
                       ],
           ),
           border: Border.all(
             color: isYourSeat
-                ? const Color(0xFFD4AF37)
+                ? const Color(0xFFC8A45D)
                 : isSelected
-                    ? const Color(0xFFD4AF37)
-                    : const Color(0xFFD4AF37).withOpacity(0.2),
+                    ? const Color(0xFFC8A45D)
+                    : const Color(0xFFC8A45D).withOpacity(0.2),
             width: (isYourSeat || isSelected) ? 2 : 1,
           ),
         ),
@@ -2262,7 +2107,7 @@ class _RoomPageState extends State<RoomPage> {
             Icon(
               Icons.account_circle,
               color: isYourSeat || isSelected
-                  ? const Color(0xFFD4AF37)
+                  ? const Color(0xFFC8A45D)
                   : Colors.white30,
               size: 40,
             ),
@@ -2275,7 +2120,7 @@ class _RoomPageState extends State<RoomPage> {
                       : '',
               style: const TextStyle(
                 fontSize: 10,
-                color: Color(0xFFD4AF37),
+                color: Color(0xFFC8A45D),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -2312,26 +2157,26 @@ class _RoomPageState extends State<RoomPage> {
                       ]
                     : isActive
                         ? [
-                            const Color(0xFFD4AF37).withOpacity(0.4),
-                            const Color(0xFFD4AF37).withOpacity(0.2),
+                            const Color(0xFFC8A45D).withOpacity(0.4),
+                            const Color(0xFFC8A45D).withOpacity(0.2),
                           ]
                         : [
-                            const Color(0xFFD4AF37).withOpacity(0.2),
-                            const Color(0xFFD4AF37).withOpacity(0.05),
+                            const Color(0xFFC8A45D).withOpacity(0.2),
+                            const Color(0xFFC8A45D).withOpacity(0.05),
                           ],
               ),
               border: Border.all(
                 color: isExit
                     ? Colors.red.withOpacity(0.5)
                     : isActive
-                        ? const Color(0xFFD4AF37)
-                        : const Color(0xFFD4AF37).withOpacity(0.3),
+                        ? const Color(0xFFC8A45D)
+                        : const Color(0xFFC8A45D).withOpacity(0.3),
                 width: isActive ? 2 : 1.5,
               ),
             ),
             child: Icon(
               icon,
-              color: isExit ? Colors.red : const Color(0xFFD4AF37),
+              color: isExit ? Colors.red : const Color(0xFFC8A45D),
               size: 28,
             ),
           ),
@@ -2341,7 +2186,7 @@ class _RoomPageState extends State<RoomPage> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: isExit ? Colors.red : const Color(0xFFD4AF37),
+              color: isExit ? Colors.red : const Color(0xFFC8A45D),
             ),
           ),
         ],
