@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "909111719371",
+    "project_id": "cuan-party",
+    "storage_bucket": "cuan-party.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909111719371:android:f0914e19390e0d6885b24e",
+        "android_client_info": {
+          "package_name": "com.example.cuan_party"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "909111719371-ib74ii8f5493vjdrjbsscg0f63qdjepf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.cuan_party",
+            "certificate_hash": "194c03674d3ae900584032a15ac81ff3937e8191"
+          }
+        },
+        {
+          "client_id": "909111719371-s9a5bdpeb9h6sjmtbuv491g1r3sh26ak.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIQdR02RmBQGL7GLixGHZ8b7uNKBUfNvg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "909111719371-s9a5bdpeb9h6sjmtbuv491g1r3sh26ak.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
