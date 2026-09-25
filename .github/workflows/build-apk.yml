@@ -17,9 +17,8 @@ jobs:
       - uses: android-actions/setup-android@v4
 
       - run: flutter pub get
-      - run: keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
-      - run: flutter build apk --release
-
+- run: flutter build apk --release
+- run: keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
       - uses: actions/upload-artifact@v4
         with:
           name: cuan-party-apk
