@@ -17,9 +17,22 @@ jobs:
       - uses: android-actions/setup-android@v4
 
       - run: flutter pub get
-      - run: mkdir -p "$HOME/.android" && keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US" -noprompt || true
-      - run: keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android
-      - run: flutter build apk --release
+
+      - name: Prepare signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/cuanparty-release.jks
+          ls -lh android/app/cuanparty-release.jks
+
+      - name: Build release APK
+        env:
+          KEYSTORE_FILE: android/app/cuanparty-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build apk --release
+
       - uses: actions/upload-artifact@v4
         with:
           name: cuan-party-apk
