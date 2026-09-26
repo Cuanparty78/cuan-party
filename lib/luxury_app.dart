@@ -3,8 +3,23 @@ import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'economy_service.dart';
 
 void main() => runApp(const CuanPartyApp());
+
+class _RealtimeEconomyBuilder extends StatelessWidget {
+  const _RealtimeEconomyBuilder({required this.uid, required this.builder});
+  final String uid;
+  final Widget Function(BuildContext context, Map<String, dynamic>? data) builder;
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: EconomyService().watchEconomyData(uid),
+      builder: (context, snapshot) => builder(context, snapshot.data),
+    );
+  }
+}
 
 class CuanPartyApp extends StatelessWidget {
   const CuanPartyApp({super.key});
@@ -30,8 +45,8 @@ const String _cuanPalaceBgBase64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHCAkIBgoJ
 const _roomPurple = Color(0xFF7A3CFF);
 const _roomGold = Color(0xFFFFD66B);
 
-final ValueNotifier<int> coinBalance = ValueNotifier<int>(125500);
-final ValueNotifier<int> diamondBalance = ValueNotifier<int>(8750);
+final ValueNotifier<int> coinBalance = ValueNotifier<int>(0);
+final ValueNotifier<int> diamondBalance = ValueNotifier<int>(0);
 
 enum _RoomEventType { chat, gift }
 
@@ -2841,6 +2856,30 @@ class _WalletPageState extends State<WalletPage> {
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final wallet = uid == null
+        ? null
+        : _RealtimeEconomyBuilder(
+            uid: uid,
+            builder: (context, data) {
+              _syncRealtimeEconomy(data);
+              return _walletScaffold();
+            },
+          );
+    return wallet ?? _walletScaffold();
+  }
+
+  void _syncRealtimeEconomy(Map<String, dynamic>? data) {
+    if (data == null) return;
+    final coin = (data['coin'] as num?)?.toInt();
+    final diamond = (data['diamond'] as num?)?.toInt();
+    if (coin != null && coin != coinBalance.value) coinBalance.value = coin;
+    if (diamond != null && diamond != diamondBalance.value) diamondBalance.value = diamond;
+    final vip = (data['vipLevel'] as num?)?.toInt();
+    if (vip != null && vip != AppProfileState.vip.value) AppProfileState.vip.value = vip;
+  }
+
+  Widget _walletScaffold() {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBF3),
       body: SafeArea(
@@ -4812,6 +4851,17 @@ class _UpgradeTile extends StatelessWidget {
         ),
       );
 }
+class VipSystemConfig {
+  static const List<int> vipPrices = [
+    7000000, 14000000, 24000000, 34000000, 51000000,
+    85000000, 135000000, 200000000, 330000000, 500000000,
+  ];
+  static const List<int> vipDailyCheckin = [
+    200000, 400000, 700000, 1000000, 1500000,
+    2500000, 4000000, 6000000, 10000000, 15000000,
+  ];
+}
+
 class VipPage extends StatefulWidget {
   final String kind;
   const VipPage({super.key, required this.kind});
@@ -4873,13 +4923,24 @@ class _VipPageState extends State<VipPage> {
             const SizedBox(height: 18),
             if (!svip) Row(children: [
               const Icon(Icons.monetization_on_rounded, color: _C.gold2), const SizedBox(width: 7),
-              const Expanded(child: Text('6,000,000 / 30 Days', style: TextStyle(color: _C.text, fontSize: 16, fontWeight: FontWeight.w900))),
-              FilledButton(onPressed: () {
-                const price = 6000000;
+              Expanded(child: Text('${_formatCoins(VipSystemConfig.vipPrices[level - 1])} / 30 Days', style: const TextStyle(color: _C.text, fontSize: 16, fontWeight: FontWeight.w900))),
+              FilledButton(onPressed: () async {
+                final price = VipSystemConfig.vipPrices[level - 1];
                 if (coinBalance.value < price) { _showMessage(context, 'Coin tidak cukup. Butuh ${_formatCoins(price)} Coin.'); return; }
-                _setCoins(coinBalance.value - price);
-                _addWalletTransaction('Aktifkan VIP$level -${_formatCoins(price)} Coin / 30 Days');
-                _showMessage(context, 'VIP$level aktif untuk 30 hari ().');
+                try {
+                  final result = await EconomyService().purchaseVip(
+                    vipLevel: level,
+                    transactionId: 'vip-${DateTime.now().microsecondsSinceEpoch}',
+                  );
+                  AppProfileState.vip.value = (result['vipLevel'] as num?)?.toInt() ?? level;
+                  final expiresRaw = result['vipExpiresAt'];
+                  if (expiresRaw is String) AppProfileState.vipExpiresAt.value = DateTime.tryParse(expiresRaw);
+                  AppProfileState.vipCheckinClaimedDate.value = null;
+                  _addWalletTransaction('Aktifkan VIP$level -${_formatCoins(price)} Coin / 30 Days');
+                  _showMessage(context, 'VIP$level aktif untuk 30 hari.');
+                } catch (e) {
+                  _showMessage(context, 'Pembelian VIP gagal: $e');
+                }
               }, style: FilledButton.styleFrom(backgroundColor: _C.gold2, foregroundColor: _C.brown, minimumSize: const Size(120, 50)), child: const Text('BUY', style: TextStyle(fontWeight: FontWeight.w900))),
             ]) else const SizedBox(height: 6),
           ]),
