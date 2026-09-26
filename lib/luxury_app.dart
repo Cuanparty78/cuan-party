@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'economy_service.dart';
 
 void main() => runApp(const CuanPartyApp());
@@ -12,6 +13,7 @@ class _RealtimeEconomyBuilder extends StatelessWidget {
   const _RealtimeEconomyBuilder({required this.uid, required this.builder});
   final String uid;
   final Widget Function(BuildContext context, Map<String, dynamic>? data) builder;
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Map<String, dynamic>?>(
@@ -20,6 +22,7 @@ class _RealtimeEconomyBuilder extends StatelessWidget {
     );
   }
 }
+
 
 class CuanPartyApp extends StatelessWidget {
   const CuanPartyApp({super.key});
@@ -34,6 +37,16 @@ class CuanPartyApp extends StatelessWidget {
         scaffoldBackgroundColor: _C.bg,
         fontFamily: 'sans',
         colorScheme: ColorScheme.fromSeed(seedColor: _C.gold),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: _C.brown,
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: _C.text),
+          bodyMedium: TextStyle(color: _C.text),
+          bodySmall: TextStyle(color: _C.muted),
+        ),
       ),
       home: const MainShell(),
     );
@@ -93,9 +106,7 @@ void _addDiamonds(int value) {
   _setDiamonds(diamondBalance.value + value);
 }
 
-final ValueNotifier<List<String>> walletTransactions = ValueNotifier<List<String>>([
-  'Saldo awal +125,500 Coin',
-]);
+final ValueNotifier<List<String>> walletTransactions = ValueNotifier<List<String>>([]);
 
 void _addWalletTransaction(String text) {
   walletTransactions.value = [text, ...walletTransactions.value];
@@ -288,6 +299,29 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int index = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentProfile();
+  }
+
+  Future<void> _loadCurrentProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final snap = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final data = snap.data();
+      if (data == null || !mounted) return;
+      AppProfileState.cuanId.value = '${data['cuanId'] ?? ''}';
+      AppProfileState.name.value = '${data['displayName'] ?? user.displayName ?? 'CUAN USER'}';
+      AppProfileState.level.value = (data['level'] is num) ? (data['level'] as num).toInt() : 0;
+      AppProfileState.country.value = '${data['country'] ?? 'Indonesia'}';
+      AppProfileState.bio.value = '${data['bio'] ?? 'Good Voice • Better Company'}';
+      AppProfileState.gender.value = '${data['gender'] ?? 'Laki-laki'}';
+      AppProfileState.vip.value = (data['vip'] is num) ? (data['vip'] as num).toInt() : 0;
+    } catch (_) {}
+  }
+
   final pages = const [
     HomePage(),
     ChatPage(),
@@ -302,7 +336,18 @@ class _MainShellState extends State<MainShell> {
         fit: StackFit.expand,
         children: [
           const _LuxuryBackdrop(),
-          IndexedStack(index: index, children: pages),
+          _RealtimeEconomyBuilder(
+            uid: FirebaseAuth.instance.currentUser?.uid ?? '',
+            builder: (context, economy) {
+              if (economy != null) {
+                final coin = economy['coin'] ?? economy['coins'] ?? economy['coinBalance'];
+                final diamond = economy['diamond'] ?? economy['diamonds'] ?? economy['diamondBalance'];
+                if (coin is num) coinBalance.value = coin.toInt();
+                if (diamond is num) diamondBalance.value = diamond.toInt();
+              }
+              return IndexedStack(index: index, children: pages);
+            },
+          ),
         ],
       ),
       bottomNavigationBar: _BottomNav(
@@ -564,7 +609,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String _mainTab = 'Saya';
+  late final PageController _pageController;
+  int _homePage = 1; // 0 = Saya, 1 = Hot, 2 = Discover
   String _mineTab = 'Terakhir';
 
   final _rooms = const [
@@ -575,28 +621,45 @@ class _HomePageState extends State<HomePage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 1);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _goHomePage(int index) {
+    setState(() => _homePage = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width - 40;
+    final bannerHeight = width / 3.5; // 700 x 200
+
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 27,
-                  backgroundColor: _C.gold2,
-                  child: Icon(Icons.person, color: _C.brown, size: 30),
-                ),
-                const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Good evening 👋', style: TextStyle(color: _C.muted, fontSize: 13)),
-                      SizedBox(height: 3),
-                      Text('CUAN PARTY', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900)),
+                      Text('CUAN PARTY', style: TextStyle(color: _C.text, fontSize: 21, fontWeight: FontWeight.w900)),
+                      SizedBox(height: 2),
+                      Text('REAL VOICES • REAL PEOPLE', style: TextStyle(color: _C.muted, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: .6)),
                     ],
                   ),
                 ),
@@ -604,51 +667,30 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.search_rounded,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSearchPage())),
                 ),
-                const SizedBox(width: 8),
-                _CircleAction(icon: Icons.notifications_none_rounded, onTap: () => _showMessage(context, 'Notifications')),
               ],
             ),
           ),
-          const _SearchBox(hint: 'Search rooms, people or family'),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Container(
-              height: 150,
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(26),
-                gradient: const LinearGradient(colors: [_C.brown, Color(0xFF9D6B32)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                border: Border.all(color: _C.gold2),
-              ),
-              child: Row(
-                children: const [
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('REAL VOICES', style: TextStyle(color: _C.gold2, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                        SizedBox(height: 8),
-                        Text('Find your people', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)),
-                        SizedBox(height: 6),
-                        Text('Discover people, rooms and moments.', style: TextStyle(color: Color(0xFFEAD9C0), fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 92, height: 108, child: DecoratedBox(decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.all(Radius.circular(24))), child: Icon(Icons.graphic_eq_rounded, size: 52, color: _C.gold2))),
-                ],
-              ),
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+            child: SizedBox(
+              width: double.infinity,
+              height: bannerHeight,
+              child: _HomeBanner(),
             ),
           ),
-          _MainTabBar(
-            tabs: const ['Saya', 'Hot', 'Discover'],
-            selected: _mainTab,
-            onChanged: (v) => setState(() => _mainTab = v),
+          _HomeSwipeTabs(selectedIndex: _homePage, onChanged: _goHomePage),
+          const SizedBox(height: 4),
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) => setState(() => _homePage = index),
+              children: [
+                ListView(padding: const EdgeInsets.only(bottom: 20), children: [_buildMine()]),
+                ListView(padding: const EdgeInsets.only(bottom: 20), children: [_buildHot()]),
+                ListView(padding: const EdgeInsets.only(bottom: 20), children: [_buildDiscover()]),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          if (_mainTab == 'Saya') _buildMine(),
-          if (_mainTab == 'Hot') _buildHot(),
-          if (_mainTab == 'Discover') _buildDiscover(),
         ],
       ),
     );
@@ -674,7 +716,7 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 10), child: Text('Semua Room', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
+        const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 10), child: Text('Hot Room', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
         for (final room in _rooms) _RoomHomeCard(room: room),
       ],
     );
@@ -684,7 +726,7 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 10), child: Text('Game', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
+        const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 10), child: Text('Discover', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: GridView.count(
@@ -695,12 +737,12 @@ class _HomePageState extends State<HomePage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: const [
-              _GameTile('Lucky Dice', Icons.casino_rounded),
-              _GameTile('Card Battle', Icons.style_rounded),
-              _GameTile('Spin Wheel', Icons.settings_backup_restore_rounded),
-              _GameTile('Quiz Room', Icons.help_outline_rounded),
-              _GameTile('Guess Song', Icons.headphones_rounded),
-              _GameTile('Arcade', Icons.sports_esports_rounded),
+              _GameTile('Lucky Gift', Icons.card_giftcard_rounded),
+              _GameTile('Event', Icons.emoji_events_rounded),
+              _GameTile('Negara', Icons.public_rounded),
+              _GameTile('Aktivitas', Icons.groups_rounded),
+              _GameTile('Room Populer', Icons.mic_external_on_rounded),
+              _GameTile('Family', Icons.family_restroom_rounded),
             ],
           ),
         ),
@@ -708,6 +750,92 @@ class _HomePageState extends State<HomePage> {
         for (final event in ['Golden Voice', 'Family Challenge', 'Weekend Party'])
           _HomeLink(icon: Icons.event_rounded, title: event, subtitle: 'Lihat event dan aktivitas terbaru', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EventsPage()))),
       ],
+    );
+  }
+}
+
+class _HomeBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3A1607), Color(0xFF8A3D08), Color(0xFF3A1607)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        border: Border.all(color: _C.gold2, width: 1.5),
+        boxShadow: const [BoxShadow(color: Color(0x553B1A00), blurRadius: 10, offset: Offset(0, 4))],
+      ),
+      child: Stack(
+        children: [
+          const Positioned(left: 16, top: 8, bottom: 8, child: Icon(Icons.diamond_rounded, color: Color(0xFF4FC3F7), size: 42)),
+          const Positioned(right: 18, top: 2, bottom: 0, child: Icon(Icons.workspace_premium_rounded, color: _C.gold2, size: 52)),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Text('SEASON 16', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+                SizedBox(height: 2),
+                Text('LEGEND STAR', style: TextStyle(color: _C.gold2, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                SizedBox(height: 5),
+                Text('SPECIAL EVENT • CUAN PARTY', style: TextStyle(color: Color(0xFFF7E8C6), fontSize: 9, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSwipeTabs extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+  const _HomeSwipeTabs({required this.selectedIndex, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['SAYA', 'HOT', 'DISCOVER'];
+    const icons = [Icons.person_rounded, Icons.local_fire_department_rounded, Icons.explore_rounded];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9E9C9),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _C.gold),
+        ),
+        child: Row(
+          children: List.generate(3, (i) {
+            final active = selectedIndex == i;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  margin: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: active ? _C.brown : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: active ? const [BoxShadow(color: Color(0x553B1A00), blurRadius: 6)] : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icons[i], size: 18, color: active ? _C.gold2 : _C.brown),
+                      const SizedBox(width: 5),
+                      Text(labels[i], style: TextStyle(color: active ? Colors.white : _C.brown, fontWeight: FontWeight.w900, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
     );
   }
 }
@@ -2274,9 +2402,7 @@ class _FamilyPageState extends State<FamilyPage> {
   String? joinedFamily;
   String? pendingFamily;
   String familyAnnouncement = 'Belum ada pengumuman. Buat dari Setting.';
-  final _ownerJoinRequests = <Map<String, String>>[
-    {'name': 'Miauu', 'id': '1000011'},
-  ];
+  final _ownerJoinRequests = <Map<String, String>>[];
   final _approvedMembers = <Map<String, String>>[];
 
   final families = const [
@@ -2515,60 +2641,235 @@ class _FamilyPageState extends State<FamilyPage> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 20),
         children: [
-          _TopBar(
-            title: 'Family',
-            actions: [
-              IconButton(
-                tooltip: 'Buat Family',
-                onPressed: _createFamily,
-                icon: const Icon(Icons.add_circle_outline_rounded),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            child: Row(
+              children: [
+                _CircleAction(icon: Icons.arrow_back_rounded, onTap: () => _showMessage(context, 'Kembali')),
+                const Spacer(),
+                const Text('FAMILY', style: TextStyle(color: _C.text, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                const Spacer(),
+                _CircleAction(icon: Icons.help_outline_rounded, onTap: () => _showFamilyGuide(context)),
+              ],
+            ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
-            child: Text('Pilih Family untuk bergabung', style: TextStyle(color: _C.muted, fontSize: 13)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: _FamilyHeroCard(),
           ),
           if (pendingFamily != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: _LuxuryCard(
                 child: Row(children: [
                   const Icon(Icons.hourglass_top_rounded, color: _C.brown),
                   const SizedBox(width: 10),
-                  Expanded(child: Text('Request JOIN $pendingFamily sedang menunggu approval Owner.',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                  Expanded(child: Text('Request JOIN $pendingFamily sedang menunggu approval Owner.', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
                 ]),
               ),
             ),
-          for (final family in families)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: _LuxuryCard(
-                onTap: () => _openFamilyProfile(family.$1, family.$2),
-                padding: const EdgeInsets.all(15),
-                child: Row(
-                  children: [
-                    const CircleAvatar(radius: 30, backgroundColor: _C.gold2, child: Icon(Icons.shield_rounded, color: _C.brown, size: 32)),
-                    const SizedBox(width: 13),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(family.$1, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                        const SizedBox(height: 4),
-                        Text(family.$2, style: const TextStyle(color: _C.muted, fontSize: 12)),
-                        const SizedBox(height: 8),
-                        Text('${family.$5}% • ${_formatCoins(family.$3)} / ${_formatCoins(family.$4)}', style: const TextStyle(color: _C.brown2, fontSize: 11, fontWeight: FontWeight.w700)),
-                      ]),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: _C.muted),
-                  ],
-                ),
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _FamilyMainButton(
+              icon: Icons.search_rounded,
+              title: 'JELAJAHI FAMILY',
+              onTap: () => _showFamilyList(context),
             ),
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _FamilyMainButton(
+              icon: Icons.add_rounded,
+              title: 'BUAT FAMILY',
+              onTap: _createFamily,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _FamilyJoinBanner(onTap: () => _showFamilyList(context)),
+          ),
         ],
       ),
     );
   }
+}
+
+void _showFamilyGuide(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Family Guide', style: TextStyle(fontWeight: FontWeight.w900)),
+      content: const Text('Temukan Family yang cocok, gabung bersama member lain, ikuti chat dan event Family, lalu kumpulkan hadiah dan ranking bersama.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup'))],
+    ),
+  );
+}
+
+void _showFamilyList(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: _C.bg,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+    builder: (_) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Text('JELAJAHI FAMILY', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            const Text('Pilih keluarga dan lihat detailnya.', style: TextStyle(color: _C.muted)),
+            const SizedBox(height: 14),
+            ...const [
+              ('STAR FAMILY', 'Together We Rise', 320450, 500000, 58),
+              ('HAPPY FAMILY', 'Always Together', 218900, 400000, 42),
+              ('BIGBOSS FAMILY', 'Royal Voice Community', 487200, 600000, 76),
+              ('SAYANG FAMILY', 'Good Vibes Only', 125600, 300000, 31),
+            ].map((family) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _LuxuryCard(
+                padding: const EdgeInsets.all(14),
+                child: Row(children: [
+                  const CircleAvatar(radius: 28, backgroundColor: _C.gold2, child: Icon(Icons.groups_rounded, color: _C.brown, size: 30)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(family.$1, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    const SizedBox(height: 3),
+                    Text(family.$2, style: const TextStyle(color: _C.muted, fontSize: 11)),
+                    const SizedBox(height: 6),
+                    Text('${family.$5}% • ${_formatCoins(family.$3)} / ${_formatCoins(family.$4)}', style: const TextStyle(color: _C.brown2, fontSize: 10, fontWeight: FontWeight.w800)),
+                  ])),
+                  const Icon(Icons.chevron_right_rounded, color: _C.muted),
+                ]),
+              ),
+            )),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _FamilyHeroCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(colors: [Color(0xFFF7E4B7), Color(0xFFFFFFFF), Color(0xFFE8C98B)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+        border: Border.all(color: _C.gold, width: 1.5),
+        boxShadow: const [BoxShadow(color: Color(0x443B1A00), blurRadius: 14, offset: Offset(0, 5))],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          const Icon(Icons.workspace_premium_rounded, color: _C.gold, size: 78),
+          const SizedBox(height: 2),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14),
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+            decoration: BoxDecoration(color: const Color(0xFF2B170B), borderRadius: BorderRadius.circular(22), border: Border.all(color: _C.gold2)),
+            child: Column(
+              children: const [
+                Text('BELUM BERGABUNG\nDENGAN FAMILY?', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 20, height: 1.15, fontWeight: FontWeight.w900)),
+                SizedBox(height: 10),
+                Text('Temukan keluarga baru, bertemu teman seru,\ndan nikmati pengalaman yang lebih menyenangkan!', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFFEAD9C0), fontSize: 11, height: 1.35)),
+                SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _FamilyFeature(Icons.groups_rounded, 'Teman\nLebih Banyak'),
+                    _FamilyFeature(Icons.chat_bubble_rounded, 'Chat\nGroup Family'),
+                    _FamilyFeature(Icons.emoji_events_rounded, 'Event\nEksklusif'),
+                    _FamilyFeature(Icons.star_rounded, 'Hadiah\ndan Ranking'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ),
+    );
+  }
+}
+
+class _FamilyFeature extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _FamilyFeature(this.icon, this.label);
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFF2B170B), shape: BoxShape.circle, border: Border.all(color: _C.gold)), child: Icon(icon, color: _C.gold2, size: 24)),
+    const SizedBox(height: 6),
+    Text(label, textAlign: TextAlign.center, style: const TextStyle(color: _C.brown, fontSize: 9, fontWeight: FontWeight.w800)),
+  ]);
+}
+
+class _FamilyMainButton extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+  const _FamilyMainButton({required this.icon, required this.title, required this.onTap});
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        height: 66,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFFFFF4D7), Color(0xFFEBCB8A)]),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: _C.gold, width: 1.4),
+          boxShadow: const [BoxShadow(color: Color(0x332B170B), blurRadius: 8, offset: Offset(0, 3))],
+        ),
+        child: Row(children: [
+          const SizedBox(width: 22),
+          Icon(icon, color: _C.brown, size: 29),
+          const SizedBox(width: 18),
+          Expanded(child: Text(title, style: const TextStyle(color: _C.brown, fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: .4))),
+          const Icon(Icons.chevron_right_rounded, color: _C.brown, size: 30),
+          const SizedBox(width: 14),
+        ]),
+      ),
+    ),
+  );
+}
+
+class _FamilyJoinBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _FamilyJoinBanner({required this.onTap});
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2B170B),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _C.gold2),
+        ),
+        child: Row(children: [
+          Container(width: 76, height: 62, decoration: BoxDecoration(color: const Color(0xFF5A2C08), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.emoji_events_rounded, color: _C.gold2, size: 42)),
+          const SizedBox(width: 14),
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('GABUNG SEKARANG', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+            SizedBox(height: 5),
+            Text('Jadilah bagian dari keluarga besar\ndan raih banyak keseruan!', style: TextStyle(color: Color(0xFFEAD9C0), fontSize: 11, height: 1.3)),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: _C.gold2, size: 28),
+        ]),
+      ),
+    ),
+  );
 }
 
 class FamilyDetailPage extends StatelessWidget {
@@ -2856,30 +3157,6 @@ class _WalletPageState extends State<WalletPage> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    final wallet = uid == null
-        ? null
-        : _RealtimeEconomyBuilder(
-            uid: uid,
-            builder: (context, data) {
-              _syncRealtimeEconomy(data);
-              return _walletScaffold();
-            },
-          );
-    return wallet ?? _walletScaffold();
-  }
-
-  void _syncRealtimeEconomy(Map<String, dynamic>? data) {
-    if (data == null) return;
-    final coin = (data['coin'] as num?)?.toInt();
-    final diamond = (data['diamond'] as num?)?.toInt();
-    if (coin != null && coin != coinBalance.value) coinBalance.value = coin;
-    if (diamond != null && diamond != diamondBalance.value) diamondBalance.value = diamond;
-    final vip = (data['vipLevel'] as num?)?.toInt();
-    if (vip != null && vip != AppProfileState.vip.value) AppProfileState.vip.value = vip;
-  }
-
-  Widget _walletScaffold() {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBF3),
       body: SafeArea(
@@ -3313,12 +3590,19 @@ class _WalletPageState extends State<WalletPage> {
                 TextField(
                   controller: _exchangeController,
                   keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Color(0xFF4F3018), fontSize: 18, fontWeight: FontWeight.w800),
+                  cursorColor: Color(0xFFB87912),
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: 'Jumlah Diamond',
+                    labelStyle: const TextStyle(color: Color(0xFF70451E), fontWeight: FontWeight.w700),
+                    floatingLabelStyle: const TextStyle(color: Color(0xFF8A5A20), fontWeight: FontWeight.w800),
                     hintText: 'Contoh: 1000',
-                    prefixIcon: const Icon(Icons.diamond_rounded),
+                    hintStyle: const TextStyle(color: Color(0xFF9B7958)),
+                    prefixIcon: const Icon(Icons.diamond_rounded, color: Color(0xFF5C8DDE)),
                     suffixText: 'min 100',
+                    suffixStyle: const TextStyle(color: Color(0xFF8A6231), fontWeight: FontWeight.w700),
+                    counterStyle: const TextStyle(color: Color(0xFF8A6231)),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -3349,7 +3633,7 @@ class _WalletPageState extends State<WalletPage> {
                       backgroundColor: const Color(0xFFB87912),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: _doExchange,
+                    onPressed: () { _doExchange(); },
                     child: const Text('EXCHANGE DIAMOND → COIN'),
                   ),
                 ),
@@ -3361,29 +3645,39 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
-  void _doExchange() {
+  Future<void> _doExchange() async {
     final value = int.tryParse(_exchangeController.text.replaceAll(',', '').trim());
 
     if (value == null || value < 100 || value % 100 != 0) {
       _showMessage(context, 'Jumlah Diamond harus kelipatan 100 dan minimal 100.');
       return;
     }
-
     if (value > diamondBalance.value) {
       _showMessage(context, 'Diamond tidak cukup.');
       return;
     }
 
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
     final coins = value * 70 ~/ 100;
-    _setDiamonds(diamondBalance.value - value);
-    _addCoins(coins);
-    _addWalletTransaction(
-      'Exchange -${_formatCoins(value)} Diamond → +${_formatCoins(coins)} Coin',
-    );
-
-    _exchangeController.clear();
-    setState(() {});
-    _showMessage(context, 'Exchange Diamond → Coin berhasil.');
+    try {
+      final result = await EconomyService().exchangeDiamondToCoin(
+        diamond: value,
+        transactionId: 'exchange_${uid}_${DateTime.now().microsecondsSinceEpoch}',
+      );
+      final newDiamond = result['diamond'] ?? result['diamonds'];
+      final newCoin = result['coin'] ?? result['coins'];
+      if (newDiamond is num) diamondBalance.value = newDiamond.toInt();
+      else diamondBalance.value = diamondBalance.value - value;
+      if (newCoin is num) coinBalance.value = newCoin.toInt();
+      else coinBalance.value = coinBalance.value + coins;
+      _addWalletTransaction('Exchange -${_formatCoins(value)} Diamond → +${_formatCoins(coins)} Coin');
+      _exchangeController.clear();
+      if (mounted) setState(() {});
+      if (mounted) _showMessage(context, 'Exchange Diamond → Coin berhasil.');
+    } catch (_) {
+      if (mounted) _showMessage(context, 'Exchange gagal. Coba lagi.');
+    }
   }
 
   Widget _emptyWallet(String text) {
@@ -3683,11 +3977,13 @@ void _showExchange(BuildContext context) {
 }
 
 class AppProfileState {
+  static final ValueNotifier<String> cuanId = ValueNotifier<String>('');
   static final ValueNotifier<String> name = ValueNotifier<String>('CUAN USER');
   static final ValueNotifier<String> age = ValueNotifier<String>('27');
   static final ValueNotifier<String> country = ValueNotifier<String>('Indonesia');
   static final ValueNotifier<String> bio = ValueNotifier<String>('Good Voice • Better Company');
   static final ValueNotifier<String> gender = ValueNotifier<String>('Laki-laki');
+  static final ValueNotifier<int> level = ValueNotifier<int>(0);
   static final ValueNotifier<int> vip = ValueNotifier<int>(0);
   static final ValueNotifier<DateTime?> vipExpiresAt = ValueNotifier<DateTime?>(null);
   static final ValueNotifier<String?> vipCheckinClaimedDate = ValueNotifier<String?>(null);
@@ -3732,19 +4028,25 @@ class ProfilePage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'ID: 1000001',
-                        style: TextStyle(
-                          color: Color(0xFFF6E5C5),
-                          fontWeight: FontWeight.w700,
+                      ValueListenableBuilder<String>(
+                        valueListenable: AppProfileState.cuanId,
+                        builder: (_, id, __) => Text(
+                          id.isEmpty ? 'ID: —' : 'ID: $id',
+                          style: const TextStyle(
+                            color: Color(0xFFF6E5C5),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 7),
-                      const Text(
-                        'Level 28 • Voice Star',
-                        style: TextStyle(
-                          color: Color(0xFFF6E5C5),
-                          fontSize: 12,
+                      ValueListenableBuilder<int>(
+                        valueListenable: AppProfileState.level,
+                        builder: (_, level, __) => Text(
+                          'Level $level',
+                          style: const TextStyle(
+                            color: Color(0xFFF6E5C5),
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -4100,6 +4402,7 @@ class StorePage extends StatefulWidget {
 class _StorePageState extends State<StorePage> {
   String tab = 'Frame';
   final tabs = const ['Frame', 'Kendaraan', 'Dekorasi Profil', 'Efek', 'Tema'];
+  final frameIds = const ['ALVINO', 'NICHA', 'TR111', 'V1JE', 'AL01', 'SHADOW', 'Miauu', 'Meow98', 'SAYANG', 'SEMAR MESEM', 'KHENTONG', 'ALLURA', 'QAYY', 'ENIGMA', 'KINCIR', 'Cantiqa', 'ASMARA', '1013976', 'LOLY', 'ABIMANYU'];
 
   @override
   Widget build(BuildContext context) {
@@ -4110,14 +4413,22 @@ class _StorePageState extends State<StorePage> {
         const SizedBox(height: 8),
         Expanded(child: GridView.builder(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-          itemCount: 10,
+          itemCount: svip ? 10 : 10,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .88),
           itemBuilder: (_, i) => _LuxuryCard(
-            onTap: () => _buyStoreItem(context, '$tab ${i + 1}', 1000000),
+            onTap: () {
+              final itemName = tab == 'Frame' ? 'Frame ${frameIds[i]}' : '$tab ${i + 1}';
+              _buyStoreItem(context, itemName, 1000000);
+            },
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Container(height: 80, decoration: BoxDecoration(gradient: const LinearGradient(colors: [_C.surface2, Color(0xFFEAD5AD)]), borderRadius: BorderRadius.circular(18)), child: Center(child: Icon(_storeIcon(tab), color: _C.gold, size: 42))),
               const SizedBox(height: 12),
-              Text('$tab ${i + 1}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.text, fontWeight: FontWeight.w800, fontSize: 15)),
+              Text(
+                tab == 'Frame' ? 'Frame ${frameIds[i]}' : '$tab ${i + 1}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _C.text, fontWeight: FontWeight.w800, fontSize: 15),
+              ),
               const SizedBox(height: 5),
               const Text('30 Days • 1,000,000 Coin', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _C.muted, fontSize: 10)),
             ]),
@@ -4854,17 +5165,6 @@ class _UpgradeTile extends StatelessWidget {
         ),
       );
 }
-class VipSystemConfig {
-  static const List<int> vipPrices = [
-    7000000, 14000000, 24000000, 34000000, 51000000,
-    85000000, 135000000, 200000000, 330000000, 500000000,
-  ];
-  static const List<int> vipDailyCheckin = [
-    200000, 400000, 700000, 1000000, 1500000,
-    2500000, 4000000, 6000000, 10000000, 15000000,
-  ];
-}
-
 class VipPage extends StatefulWidget {
   final String kind;
   const VipPage({super.key, required this.kind});
@@ -4873,7 +5173,7 @@ class VipPage extends StatefulWidget {
 }
 
 class _VipPageState extends State<VipPage> {
-  int level = 10;
+  int level = 1;
 
   bool get svip => widget.kind == 'SVIP';
 
@@ -4895,7 +5195,7 @@ class _VipPageState extends State<VipPage> {
               height: 46,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: 10,
+                itemCount: svip ? 10 : 10,
                 separatorBuilder: (_, __) => const SizedBox(width: 22),
                 itemBuilder: (_, i) => GestureDetector(
                   onTap: () => setState(() => level = i + 1),
@@ -4914,7 +5214,11 @@ class _VipPageState extends State<VipPage> {
             ),
             const SizedBox(height: 8),
             _VipHero(kind: widget.kind, level: level),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
+            if (svip) ...[
+              _SvipStatusCard(level: level),
+              const SizedBox(height: 14),
+            ],
             Text('Royal Privileges', style: const TextStyle(color: _C.gold2, fontSize: 20, fontWeight: FontWeight.w900)),
             Text('$count/$count', style: const TextStyle(color: _C.gold2, fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 12),
@@ -4924,30 +5228,142 @@ class _VipPageState extends State<VipPage> {
               itemBuilder: (_, i) => _BenefitCard(title: benefits[i], index: i, svip: svip),
             ),
             const SizedBox(height: 18),
-            if (!svip) Row(children: [
-              const Icon(Icons.monetization_on_rounded, color: _C.gold2), const SizedBox(width: 7),
-              Expanded(child: Text('${_formatCoins(VipSystemConfig.vipPrices[level - 1])} / 30 Days', style: const TextStyle(color: _C.text, fontSize: 16, fontWeight: FontWeight.w900))),
-              FilledButton(onPressed: () async {
-                final price = VipSystemConfig.vipPrices[level - 1];
-                if (coinBalance.value < price) { _showMessage(context, 'Coin tidak cukup. Butuh ${_formatCoins(price)} Coin.'); return; }
-                try {
-                  final result = await EconomyService().purchaseVip(
-                    vipLevel: level,
-                    transactionId: 'vip-${DateTime.now().microsecondsSinceEpoch}',
-                  );
-                  AppProfileState.vip.value = (result['vipLevel'] as num?)?.toInt() ?? level;
-                  final expiresRaw = result['vipExpiresAt'];
-                  if (expiresRaw is String) AppProfileState.vipExpiresAt.value = DateTime.tryParse(expiresRaw);
-                  AppProfileState.vipCheckinClaimedDate.value = null;
-                  _addWalletTransaction('Aktifkan VIP$level -${_formatCoins(price)} Coin / 30 Days');
-                  _showMessage(context, 'VIP$level aktif untuk 30 hari.');
-                } catch (e) {
-                  _showMessage(context, 'Pembelian VIP gagal: $e');
-                }
-              }, style: FilledButton.styleFrom(backgroundColor: _C.gold2, foregroundColor: _C.brown, minimumSize: const Size(120, 50)), child: const Text('BUY', style: TextStyle(fontWeight: FontWeight.w900))),
-            ]) else const SizedBox(height: 6),
+            if (!svip) _VipPurchaseCard(level: level) else const SizedBox(height: 6),
           ]),
         )),
+      ]),
+    );
+  }
+}
+
+class _SvipStatusCard extends StatefulWidget {
+  final int level;
+  const _SvipStatusCard({required this.level});
+  @override
+  State<_SvipStatusCard> createState() => _SvipStatusCardState();
+}
+
+class _SvipStatusCardState extends State<_SvipStatusCard> {
+  int points = 0;
+  int currentLevel = 1;
+  int target = 100000000;
+  int daysRemaining = 60;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await EconomyService().getSvipStatus();
+      if (!mounted) return;
+      final rawLevel = data['level'] ?? data['svipLevel'];
+      final rawPoints = data['points'] ?? data['svipPoints'] ?? data['currentPoints'];
+      final rawTarget = data['target'] ?? data['targetPoints'] ?? data['requiredPoints'];
+      final rawDays = data['daysRemaining'] ?? data['remainingDays'] ?? data['progressDaysRemaining'];
+      setState(() {
+        if (rawLevel is num) currentLevel = rawLevel.toInt().clamp(0, 10);
+        if (rawPoints is num) points = rawPoints.toInt();
+        if (rawTarget is num && rawTarget.toInt() > 0) target = rawTarget.toInt();
+        else if (currentLevel > 1) target = 0;
+        if (rawDays is num) daysRemaining = rawDays.toInt();
+        loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isMax = currentLevel >= 10;
+    final progress = isMax || target <= 0 ? 1.0 : (points / target).clamp(0.0, 1.0);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(color: const Color(0xFF24170E), borderRadius: BorderRadius.circular(22), border: Border.all(color: _C.gold.withOpacity(.65))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('CARA MENDAPATKAN SVIP', style: TextStyle(color: _C.gold2, fontSize: 16, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 7),
+        const Text('1 Coin Top Up = 1 SVIP Point', style: TextStyle(color: Color(0xFFFFF4D6), fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Point bersifat kumulatif. Menggunakan Coin tidak mengurangi SVIP Point.', style: TextStyle(color: Color(0xFFE6D2B2), fontSize: 12, height: 1.35)),
+        const SizedBox(height: 14),
+        Row(children: [
+          const Text('SVIP POINT', style: TextStyle(color: _C.gold2, fontWeight: FontWeight.w900)),
+          const Spacer(),
+          Text(isMax ? 'MAX' : target > 0 ? '${_formatCoins(points)} / ${_formatCoins(target)}' : '${_formatCoins(points)} / Target Owner', style: const TextStyle(color: Color(0xFFFFF4D6), fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 8),
+        ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(minHeight: 9, value: progress, backgroundColor: Colors.white12, valueColor: const AlwaysStoppedAnimation<Color>(_C.gold2))),
+        const SizedBox(height: 9),
+        Text(isMax ? 'SVIP10 — MAX LEVEL' : 'Sisa periode progres: $daysRemaining hari', style: const TextStyle(color: Color(0xFFFFF4D6), fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        const Row(children: [
+          Icon(Icons.timer_outlined, color: _C.gold2, size: 18),
+          SizedBox(width: 6),
+          Expanded(child: Text('Jika target periode 60 hari tidak tercapai, level tetap dan progres periode kembali 0.', style: TextStyle(color: Color(0xFFE6D2B2), fontSize: 11.5, height: 1.35))),
+        ]),
+        const SizedBox(height: 7),
+        const Row(children: [
+          Icon(Icons.schedule_outlined, color: _C.gold2, size: 18),
+          SizedBox(width: 6),
+          Expanded(child: Text('Tanpa aktivitas Top Up selama 120 hari → turun 1 level. Aktivitas baru mereset timer 120 hari. Setiap demosi mengulang progres dari 0.', style: TextStyle(color: Color(0xFFE6D2B2), fontSize: 11.5, height: 1.35))),
+        ]),
+        if (loading) ...[
+          const SizedBox(height: 8),
+          const Text('Memuat status SVIP…', style: TextStyle(color: Color(0xFFE6D2B2), fontSize: 11)),
+        ],
+      ]),
+    );
+  }
+}
+
+class _VipPurchaseCard extends StatelessWidget {
+  final int level;
+  const _VipPurchaseCard({required this.level});
+
+  static const prices = [0, 7000000, 14000000, 24000000, 34000000, 51000000, 85000000, 135000000, 200000000, 330000000, 500000000];
+  static const checkins = [0, 200000, 400000, 700000, 1000000, 1500000, 2500000, 4000000, 6000000, 10000000, 15000000];
+
+  @override
+  Widget build(BuildContext context) {
+    final price = prices[level.clamp(1, 10)];
+    final checkin = checkins[level.clamp(1, 10)];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: const Color(0xFF24170E), borderRadius: BorderRadius.circular(22), border: Border.all(color: _C.gold.withOpacity(.6))),
+      child: Row(children: [
+        const Icon(Icons.monetization_on_rounded, color: _C.gold2, size: 28),
+        const SizedBox(width: 9),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('VIP $level • ${_formatCoins(price)} Coin', style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 15, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text('Check-in harian ${_formatCoins(checkin)} Coin • 30 Days', style: const TextStyle(color: Color(0xFFE6D2B2), fontSize: 11.5)),
+        ])),
+        FilledButton(
+          onPressed: () async {
+            final uid = FirebaseAuth.instance.currentUser?.uid;
+            if (uid == null) return;
+            if (coinBalance.value < price) { _showMessage(context, 'Coin tidak cukup. Butuh ${_formatCoins(price)} Coin.'); return; }
+            try {
+              final result = await EconomyService().purchaseVip(vipLevel: level, transactionId: 'vip_${uid}_${DateTime.now().microsecondsSinceEpoch}');
+              if (!context.mounted) return;
+              final newBalance = result['coin'] ?? result['coins'];
+              if (newBalance is num) coinBalance.value = newBalance.toInt();
+              AppProfileState.vip.value = level;
+              _addWalletTransaction('Aktifkan VIP$level -${_formatCoins(price)} Coin / 30 Days');
+              _showMessage(context, 'VIP$level aktif untuk 30 hari.');
+            } catch (_) {
+              if (context.mounted) _showMessage(context, 'Pembelian VIP gagal. Coba lagi.');
+            }
+          },
+          style: FilledButton.styleFrom(backgroundColor: _C.gold2, foregroundColor: _C.brown, minimumSize: const Size(82, 46)),
+          child: const Text('BUY', style: TextStyle(fontWeight: FontWeight.w900)),
+        ),
       ]),
     );
   }
@@ -4971,7 +5387,7 @@ class _VipHero extends StatelessWidget {
           const SizedBox(height: 5),
           Text('${svip ? 'SVIP' : 'VIP'}$level', style: TextStyle(color: _C.gold2, fontSize: 38, fontWeight: FontWeight.w900, shadows: [Shadow(color: _C.gold.withOpacity(.5), blurRadius: 12)])),
           const SizedBox(height: 4),
-          const Text('Exclusive privileges designed for you.', style: TextStyle(color: _C.text, fontWeight: FontWeight.w700)),
+          Text(svip ? 'SVIP berdasarkan Top Up • bukan pembelian langsung.' : 'VIP dibeli menggunakan Coin dan aktif 30 hari.', style: const TextStyle(color: Color(0xFFFFF4D6), fontWeight: FontWeight.w800)),
         ])),
       ]),
     );
@@ -5071,8 +5487,14 @@ class InvitationPage extends StatelessWidget {
         const Icon(Icons.card_giftcard_rounded, color: _C.gold, size: 58),
         const SizedBox(height: 10), const Text('Ajak teman ke CUAN PARTY', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8), const Text('Bagikan ID referral kamu dan pantau undangan.', textAlign: TextAlign.center, style: TextStyle(color: _C.muted)),
-        const SizedBox(height: 18), Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _C.surface2, borderRadius: BorderRadius.circular(16), border: Border.all(color: _C.gold)), child: const Text('CP1000001', style: TextStyle(color: _C.brown, fontSize: 20, fontWeight: FontWeight.w900))),
-        const SizedBox(height: 14), FilledButton.icon(onPressed: () => _showMessage(context, 'Kode referral disalin: CP1000001'), icon: const Icon(Icons.copy_rounded), label: const Text('Salin Kode'), style: FilledButton.styleFrom(backgroundColor: _C.brown)),
+        const SizedBox(height: 18), Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _C.surface2, borderRadius: BorderRadius.circular(16), border: Border.all(color: _C.gold)), child: ValueListenableBuilder<String>(
+          valueListenable: AppProfileState.cuanId,
+          builder: (_, id, __) => Text(
+            id.isEmpty ? 'CUAN ID belum tersedia' : id,
+            style: const TextStyle(color: _C.brown, fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+        )),
+        const SizedBox(height: 14), FilledButton.icon(onPressed: () => _showMessage(context, 'Kode referral: ' + (AppProfileState.cuanId.value.isEmpty ? 'CUAN ID belum tersedia' : AppProfileState.cuanId.value)), icon: const Icon(Icons.copy_rounded), label: const Text('Salin Kode'), style: FilledButton.styleFrom(backgroundColor: _C.brown)),
       ])),
     ]),
   );
@@ -5486,10 +5908,35 @@ class UserSearchPage extends StatefulWidget {
 class _UserSearchPageState extends State<UserSearchPage> {
   final _controller = TextEditingController();
   String? _foundId;
+  String? _foundName;
 
-  void _search() {
+  Future<void> _search() async {
     final id = _controller.text.trim();
-    setState(() => _foundId = id == '1000001' ? id : null);
+    if (id.isEmpty) {
+      setState(() { _foundId = null; _foundName = null; });
+      return;
+    }
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('cuanId', isEqualTo: id)
+          .limit(1)
+          .get();
+      if (!mounted) return;
+      if (snap.docs.isEmpty) {
+        setState(() { _foundId = null; _foundName = null; });
+      } else {
+        final data = snap.docs.first.data();
+        setState(() {
+          _foundId = '${data['cuanId'] ?? id}';
+          _foundName = '${data['displayName'] ?? 'CUAN USER'}';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _foundId = null; _foundName = null; });
+      _showMessage(context, 'Pencarian user gagal. Coba lagi.');
+    }
   }
 
   @override
@@ -5540,16 +5987,16 @@ class _UserSearchPageState extends State<UserSearchPage> {
             )),
           if (_foundId != null)
             _LuxuryCard(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PrivateChatPage(userName: AppProfileState.name.value, userId: '1000001'))),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PrivateChatPage(userName: _foundName ?? 'CUAN USER', userId: _foundId ?? ''))),
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   const CircleAvatar(radius: 28, backgroundColor: _C.gold2, child: Icon(Icons.person, color: _C.brown)),
                   const SizedBox(width: 12),
-                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('CUAN USER', style: TextStyle(color: _C.text, fontWeight: FontWeight.w900, fontSize: 16)),
-                    SizedBox(height: 4),
-                    Text('ID: 1000001', style: TextStyle(color: _C.muted)),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_foundName ?? 'CUAN USER', style: const TextStyle(color: _C.text, fontWeight: FontWeight.w900, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text('ID: ' + (_foundId ?? ''), style: const TextStyle(color: _C.muted)),
                   ])),
                   const Icon(Icons.chat_bubble_outline_rounded, color: _C.gold),
                 ],
@@ -5685,31 +6132,11 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final _items = const [
-    _ChatItem('Nana', 'Kamu on malam ini? 😍', '2m', 3),
-    _ChatItem('Raka', 'Voice call?', '10m', 0),
-    _ChatItem('Salsa', 'Oke deh, sampai nanti!', '1h', 0),
-    _ChatItem('Dimas', 'Mantap!', '2h', 0),
-    _ChatItem('Official Cuan Party', 'Event baru sudah hadir!', '3h', 0),
-    _ChatItem('System', 'Your Coins have been updated', '1d', 0),
-  ];
-
-  final _users = const [
-    ('Nana', '1000002'), ('Raka', '1000003'), ('Salsa', '1000004'), ('Dimas', '1000005'), ('QueenA', '1000006'), ('Jep', '1000001'),
-  ];
-
+  final List<_ChatItem> _items = [];
+  final List<(String, String)> _users = [];
   String _messageTab = 'Messages';
-
-  final List<(String, String)> _friends = [
-    ('Nana', '1000002'),
-    ('Raka', '1000003'),
-    ('Salsa', '1000004'),
-  ];
-
-  final _requests = <Map<String, String>>[
-    {'name': 'Miauu', 'id': '1000011'},
-    {'name': 'AL01', 'id': '1000012'},
-  ];
+  final List<(String, String)> _friends = [];
+  final List<Map<String, String>> _requests = [];
 
   void _searchUser() {
     final controller = TextEditingController();
@@ -5930,11 +6357,7 @@ class _ChatPageState extends State<ChatPage> {
                     MaterialPageRoute(
                       builder: (_) => PrivateChatPage(
                         userName: item.name,
-                        userId: item.name == 'Nana'
-                            ? '1000002'
-                            : item.name == 'Raka'
-                                ? '1000003'
-                                : '1000004',
+                        userId: '',
                       ),
                     ),
                   ),
