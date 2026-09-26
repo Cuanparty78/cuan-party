@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'luxury_app.dart';
+import 'user_service.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -70,6 +71,11 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       await FirebaseAuth.instance.signInWithCredential(credential);
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+if (currentUser != null) {
+  await UserService.ensureUserProfile(currentUser);
+}
     } on GoogleSignInException catch (e) {
       if (!mounted) return;
       setState(() {
