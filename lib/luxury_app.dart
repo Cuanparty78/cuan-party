@@ -4413,7 +4413,7 @@ class _StorePageState extends State<StorePage> {
         const SizedBox(height: 8),
         Expanded(child: GridView.builder(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-          itemCount: svip ? 10 : 10,
+          itemCount: tab == 'Frame' ? frameIds.length : 10,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .88),
           itemBuilder: (_, i) => _LuxuryCard(
             onTap: () {
