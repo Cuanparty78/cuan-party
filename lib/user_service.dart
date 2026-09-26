@@ -20,7 +20,7 @@ class UserService {
         'photoUrl': user.photoURL ?? '',
         'coin': 0,
         'diamond': 0,
-        'level': 0,
+        'level': 1,
         'vip': 0,
         'svip': 0,
         'svipPoints': 0,
@@ -39,10 +39,16 @@ class UserService {
     if (data['cuanId'] == null || '${data['cuanId']}'.trim().isEmpty) {
       patch['cuanId'] = (await _allocateCuanId()).toString();
     }
-    if (data['displayName'] == null) patch['displayName'] = (user.displayName ?? '').trim();
+    if (data['displayName'] == null ||
+        '${data['displayName']}'.trim().isEmpty) {
+      patch['displayName'] = (user.displayName ?? '').trim();
+    }
     if (data['coin'] == null) patch['coin'] = 0;
     if (data['diamond'] == null) patch['diamond'] = 0;
-    if (data['level'] == null) patch['level'] = 0;
+    if (data['level'] == null ||
+        (data['level'] is num && (data['level'] as num).toInt() < 1)) {
+      patch['level'] = 1;
+    }
     if (data['vip'] == null) patch['vip'] = 0;
     if (data['svip'] == null) patch['svip'] = 0;
     if (data['svipPoints'] == null) patch['svipPoints'] = 0;
