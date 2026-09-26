@@ -3688,6 +3688,9 @@ class AppProfileState {
   static final ValueNotifier<String> country = ValueNotifier<String>('Indonesia');
   static final ValueNotifier<String> bio = ValueNotifier<String>('Good Voice • Better Company');
   static final ValueNotifier<String> gender = ValueNotifier<String>('Laki-laki');
+  static final ValueNotifier<int> vip = ValueNotifier<int>(0);
+  static final ValueNotifier<DateTime?> vipExpiresAt = ValueNotifier<DateTime?>(null);
+  static final ValueNotifier<String?> vipCheckinClaimedDate = ValueNotifier<String?>(null);
 }
 
 class ProfilePage extends StatelessWidget {
