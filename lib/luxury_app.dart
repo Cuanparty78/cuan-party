@@ -2251,6 +2251,51 @@ class _LuxuryGiftCard extends StatelessWidget {
   }
 }
 
+class _FamilyAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _FamilyAction(this.icon, this.label, this.onTap);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          decoration: BoxDecoration(
+            color: _C.surface2,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _C.line),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: _C.brown, size: 24),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _C.text,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatLine extends StatelessWidget {
   final String name;
   final String message;
@@ -4063,7 +4108,7 @@ class ProfilePage extends StatelessWidget {
               Expanded(
                 child: ValueListenableBuilder<String>(
                   valueListenable: AppProfileState.name,
-                  builder: (context, profileName.isEmpty ? 'Nama belum diatur' : profileName, _) => Column(
+                  builder: (context, profileName, _) => Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
