@@ -4448,34 +4448,7 @@ final svipLabel = svip > 0 ? '👑 SVIP $svip' : '';
 
               const SizedBox(height: 5),
 
-if (vipLabel.isNotEmpty || svipLabel.isNotEmpty)
-  Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      if (vipLabel.isNotEmpty)
-        Text(
-          vipLabel,
-          style: const TextStyle(
-            color: _C.gold2,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      if (vipLabel.isNotEmpty && svipLabel.isNotEmpty)
-        const SizedBox(width: 8),
-      if (svipLabel.isNotEmpty)
-        Text(
-          svipLabel,
-          style: const TextStyle(
-            color: _C.gold2,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-    ],
-  ),
 
-const SizedBox(height: 5),
 Row(
   mainAxisAlignment: MainAxisAlignment.center,
   children: [
