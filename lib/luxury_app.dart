@@ -4446,13 +4446,75 @@ final gameLevel = gameValue is num
                           ),
                         ),
                         const SizedBox(height: 7),
-                        Text(
-                          'Level $level',
-                          style: const TextStyle(
-                            color: Color(0xFFF6E5C5),
-                            fontSize: 12,
-                          ),
-                        ),
+                        Row(
+  children: [
+    Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 6,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: _getLevelTierColor(wealthLevel),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '🪙 LV $wealthLevel',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ),
+    const SizedBox(width: 5),
+    Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 6,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: _getLevelTierColor(charmLevel),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '💖 LV $charmLevel',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ),
+    const SizedBox(width: 5),
+    Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 6,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: _getLevelTierColor(gameLevel),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '🎮 LV $gameLevel',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ),
+  ],
+),
                       ],
                     ),
                   ),
