@@ -6114,6 +6114,9 @@ class _VipPageState extends State<VipPage> {
               _SvipStatusCard(level: level),
               const SizedBox(height: 14),
             ],
+            _VipDailyCheckin(level: level),
+
+const SizedBox(height: 14),
             Text('Royal Privileges', style: const TextStyle(color: _C.gold2, fontSize: 20, fontWeight: FontWeight.w900)),
             Text('$count/$count', style: const TextStyle(color: _C.gold2, fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 12),
@@ -6130,7 +6133,268 @@ class _VipPageState extends State<VipPage> {
     );
   }
 }
+class _VipDailyCheckin extends StatefulWidget {
+  final int level;
 
+  const _VipDailyCheckin({
+    required this.level,
+  });
+
+  @override
+  State<_VipDailyCheckin> createState() => _VipDailyCheckinState();
+}
+
+class _VipDailyCheckinState extends State<_VipDailyCheckin> {
+  bool _loading = true;
+  bool _claimed = false;
+  int _ownedVip = 0;
+  int _reward = 0;
+
+  static const List<int> _checkinRewards = [
+    0,
+    200000,
+    400000,
+    700000,
+    1000000,
+    1500000,
+    2500000,
+    4000000,
+    6000000,
+    10000000,
+    15000000,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        if (mounted) {
+          setState(() => _loading = false);
+        }
+        return;
+      }
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final data = snapshot.data() ?? {};
+
+      final rawVip = data['vip'];
+      final vip = rawVip is num
+          ? rawVip.toInt().clamp(0, 10)
+          : 0;
+
+      final today = DateTime.now();
+      final todayKey =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      final lastCheckIn = data['vipLastCheckin'];
+
+      if (!mounted) return;
+
+      setState(() {
+        _ownedVip = vip;
+        _reward = _checkinRewards[vip];
+        _claimed = lastCheckIn == todayKey;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canClaim = !_loading &&
+        !_claimed &&
+        _ownedVip > 0 &&
+        _reward > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _C.gold,
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _C.gold.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.calendar_month_rounded,
+              color: _C.gold,
+              size: 28,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'VIP DAILY CHECK-IN',
+                  style: TextStyle(
+                    color: _C.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  _ownedVip > 0
+                      ? '+${_formatCoins(_reward)} Coin setiap hari'
+                      : 'Aktifkan VIP untuk mendapatkan Coin',
+                  style: const TextStyle(
+                    color: _C.muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          ElevatedButton(
+            onPressed: canClaim ? _checkIn : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _C.gold,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _C.line,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              _loading
+                  ? '...'
+                  : _ownedVip <= 0
+                      ? 'VIP'
+                      : _claimed
+                          ? 'CLAIMED'
+                          : 'CHECK-IN',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkIn() async {
+    if (_loading || _claimed || _ownedVip <= 0) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        throw Exception('User belum login');
+      }
+
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+
+      await FirebaseFirestore.instance.runTransaction(
+        (transaction) async {
+          final snapshot = await transaction.get(ref);
+          final data = snapshot.data() ?? {};
+
+          final rawVip = data['vip'];
+          final vip = rawVip is num
+              ? rawVip.toInt().clamp(0, 10)
+              : 0;
+
+          if (vip <= 0) {
+            throw Exception('Kamu belum memiliki VIP.');
+          }
+
+          final today = DateTime.now();
+          final todayKey =
+              '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+          final lastCheckIn = data['vipLastCheckin'];
+
+          if (lastCheckIn == todayKey) {
+            throw Exception('Kamu sudah check-in hari ini.');
+          }
+
+          final reward = _checkinRewards[vip];
+
+          if (reward <= 0) {
+            throw Exception('Reward VIP tidak tersedia.');
+          }
+
+          final rawCoin = data['coin'];
+          final currentCoin = rawCoin is num
+              ? rawCoin.toInt()
+              : 0;
+
+          transaction.update(ref, {
+            'coin': currentCoin + reward,
+            'vipLastCheckin': todayKey,
+          });
+        },
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _claimed = true;
+        _loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Check-in berhasil! +${_formatCoins(_reward)} Coin',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+}
 class _SvipStatusCard extends StatefulWidget {
   final int level;
   const _SvipStatusCard({required this.level});
