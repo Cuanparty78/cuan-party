@@ -696,44 +696,266 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHot() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 10), child: Text('Hot Room', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
-        const _EmptyStateCard(message: 'Belum ada Hot Room.'),
-      ],
-    );
+    return const _HotRoomsSection();
   }
 
   Widget _buildDiscover() {
+    const games = [
+      ('Ludo', Icons.sports_esports_rounded),
+      ('Monster Crush', Icons.extension_rounded),
+      ('UNO', Icons.style_rounded),
+      ('Carrom', Icons.circle_rounded),
+      ('Domino', Icons.grid_view_rounded),
+      ('Jackaroo', Icons.groups_rounded),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 10), child: Text('Discover', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 6, 20, 10),
+          child: Text('Discover', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900)),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: Text('GAME', style: TextStyle(color: _C.brown, fontSize: 14, fontWeight: FontWeight.w900)),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.25,
+          child: GridView.builder(
+            itemCount: games.length,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            children: const [
-              _GameTile('Lucky Gift', Icons.card_giftcard_rounded),
-              _GameTile('Event', Icons.emoji_events_rounded),
-              _GameTile('Negara', Icons.public_rounded),
-              _GameTile('Aktivitas', Icons.groups_rounded),
-              _GameTile('Room Populer', Icons.mic_external_on_rounded),
-              _GameTile('Family', Icons.family_restroom_rounded),
-            ],
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.35,
+            ),
+            itemBuilder: (context, index) {
+              final game = games[index];
+              return _GameTile(game.$1, game.$2);
+            },
           ),
         ),
-        const Padding(padding: EdgeInsets.fromLTRB(20, 18, 20, 10), child: Text('CP Ranking', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
-        _HomeLink(icon: Icons.favorite_rounded, title: 'CP Ranking', subtitle: 'Lihat ranking pasangan yang tersedia', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RankingPage(type: 'CP / Couple')))),
-        const Padding(padding: EdgeInsets.fromLTRB(20, 18, 20, 10), child: Text('Event', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))),
-        const _EmptyStateCard(message: 'Belum ada event aktif.'),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+          child: Text('BANNER EVENT', style: TextStyle(color: _C.brown, fontSize: 14, fontWeight: FontWeight.w900)),
+        ),
+        _DiscoverEventBanner(
+          title: 'CP RANKING',
+          subtitle: 'Ranking pasangan CP',
+          icon: Icons.emoji_events_rounded,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RankingPage(type: 'CP / Couple'))),
+        ),
+        const SizedBox(height: 10),
+        _DiscoverEventBanner(
+          title: 'WEEKLY STAR',
+          subtitle: 'Event mingguan CUAN PARTY',
+          icon: Icons.star_rounded,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EventsPage())),
+        ),
       ],
+    );
+  }
+}
+
+
+class _HotRoomsSection extends StatefulWidget {
+  const _HotRoomsSection();
+
+  @override
+  State<_HotRoomsSection> createState() => _HotRoomsSectionState();
+}
+
+class _HotRoomsSectionState extends State<_HotRoomsSection> {
+  String country = 'All Country';
+  static const _defaultCountries = <String>[
+    'Indonesia',
+    'Malaysia',
+    'Singapore',
+    'Thailand',
+    'Philippines',
+    'Vietnam',
+    'China',
+    'Arab Saudi',
+  ];
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _roomsStream() {
+    return FirebaseFirestore.instance
+        .collection('rooms')
+        .orderBy('giftTotal', descending: true)
+        .limit(100)
+        .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _roomsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: _EmptyStateCard(message: 'Hot Room belum dapat dimuat dari server.'),
+          );
+        }
+        final docs = [...(snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])];
+        docs.sort((a, b) {
+          final av = a.data()['giftTotal'];
+          final bv = b.data()['giftTotal'];
+          final an = av is num ? av.toDouble() : double.tryParse('$av') ?? 0;
+          final bn = bv is num ? bv.toDouble() : double.tryParse('$bv') ?? 0;
+          return bn.compareTo(an);
+        });
+        final discoveredCountries = <String>{..._defaultCountries};
+        for (final doc in docs) {
+          final value = '${doc.data()['country'] ?? ''}'.trim();
+          if (value.isNotEmpty) discoveredCountries.add(value);
+        }
+        final countries = ['All Country', ...discoveredCountries.toList()..sort()];
+        if (country != 'All Country' && !countries.contains(country)) {
+          country = 'All Country';
+        }
+        docs.removeWhere((d) {
+          if (country == 'All Country') return false;
+          return '${d.data()['country'] ?? ''}' != country;
+        });
+        docs.sort((a, b) {
+          final av = a.data()['giftTotal'] is num ? (a.data()['giftTotal'] as num).toDouble() : 0;
+          final bv = b.data()['giftTotal'] is num ? (b.data()['giftTotal'] as num).toDouble() : 0;
+          return bv.compareTo(av);
+        });
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 6, 20, 10),
+              child: Text('HOT', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900)),
+            ),
+            SizedBox(
+              height: 42,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                scrollDirection: Axis.horizontal,
+                itemCount: countries.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final selected = country == countries[i];
+                  return ChoiceChip(
+                    label: Text(countries[i]),
+                    selected: selected,
+                    onSelected: (_) => setState(() => country = countries[i]),
+                    selectedColor: _C.brown,
+                    labelStyle: TextStyle(color: selected ? Colors.white : _C.brown, fontWeight: FontWeight.w800),
+                    backgroundColor: _C.surface2,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (docs.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: _EmptyStateCard(message: 'Belum ada Hot Room dari server.'),
+              )
+            else
+              ...docs.map((doc) {
+                final d = doc.data();
+                final name = '${d['name'] ?? d['roomName'] ?? 'Voice Room'}';
+                final owner = '${d['ownerName'] ?? d['hostName'] ?? ''}';
+                final gift = d['giftTotal'] is num ? (d['giftTotal'] as num).toInt() : 0;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: _LuxuryCard(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RoomDetailPage(
+                          roomName: name,
+                          owner: owner.isEmpty ? 'Host' : owner,
+                          seats: 10,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: _C.gold2,
+                          child: Icon(Icons.mic_rounded, color: _C.brown),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.text, fontWeight: FontWeight.w900)),
+                              if (owner.isNotEmpty)
+                                Text(owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.muted, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.card_giftcard_rounded, color: _C.gold, size: 18),
+                        const SizedBox(width: 4),
+                        Text(_formatCoins(gift), style: const TextStyle(color: _C.brown, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DiscoverEventBanner extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _DiscoverEventBanner({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: _LuxuryCard(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: _C.gold2,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: _C.brown, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: _C.text, fontSize: 16, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: const TextStyle(color: _C.muted, fontSize: 12)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: _C.muted),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -4316,7 +4538,7 @@ class ProfilePage extends StatelessWidget {
             () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const RankingPage(type: 'CP / Couple'),
+                builder: (_) => const CouplePage(),
               ),
             ),
           ),
@@ -4514,7 +4736,7 @@ class StorePage extends StatefulWidget {
 class _StorePageState extends State<StorePage> {
   String tab = 'Frame';
   final tabs = const ['Frame', 'Kendaraan', 'Dekorasi Profil', 'Efek', 'Tema'];
-  final frameIds = const ['ALVINO', 'NICHA', 'TR111', 'V1JE', 'AL01', 'SHADOW', 'Miauu', 'Meow98', 'SAYANG', 'SEMAR MESEM', 'KHENTONG', 'ALLURA', 'QAYY', 'ENIGMA', 'KINCIR', 'Cantiqa', 'ASMARA', '1013976', 'LOLY', 'ABIMANYU'];
+  final frameIds = List<String>.generate(20, (i) => 'FRAME ${i + 1}', growable: false);
 
   @override
   Widget build(BuildContext context) {
@@ -4538,7 +4760,7 @@ class _StorePageState extends State<StorePage> {
                 style: const TextStyle(color: _C.text, fontWeight: FontWeight.w800, fontSize: 15),
               ),
               const SizedBox(height: 5),
-              const Text('Catalog resmi • Pembelian belum tersedia', maxLines: 2, textAlign: TextAlign.center, style: TextStyle(color: _C.muted, fontSize: 10)),
+              const Text('Katalog resmi CUAN PARTY', maxLines: 2, textAlign: TextAlign.center, style: TextStyle(color: _C.muted, fontSize: 10)),
             ]),
           ),
         )),
@@ -4644,7 +4866,7 @@ class _BadgePageState extends State<BadgePage> {
                   Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(badge.$1, style: const TextStyle(fontWeight: FontWeight.w900)),
+                      Text(badge.$1, style: const TextStyle(color: _C.text, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 3),
                       Text(badge.$3, style: const TextStyle(color: _C.muted, fontSize: 12)),
                     ],
@@ -5620,6 +5842,191 @@ class CustomerServicePage extends StatelessWidget {
   );
 }
 
+
+class CouplePage extends StatefulWidget {
+  const CouplePage({super.key});
+
+  @override
+  State<CouplePage> createState() => _CouplePageState();
+}
+
+class _CouplePageState extends State<CouplePage> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _bind() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final partnerId = _controller.text.trim();
+    if (user == null || partnerId.isEmpty) {
+      _showMessage(context, 'Masukkan CUAN ID pasangan.');
+      return;
+    }
+    try {
+      final selfSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final selfCuanId = '${selfSnap.data()?['cuanId'] ?? ''}'.trim();
+      if (selfCuanId.isNotEmpty && selfCuanId == partnerId) {
+        if (mounted) _showMessage(context, 'Tidak bisa memasang CP dengan akun sendiri.');
+        return;
+      }
+
+      await FirebaseFirestore.instance.collection('cp_requests').add({
+        'fromUid': user.uid,
+        'fromCuanId': selfCuanId,
+        'fromName': user.displayName ?? '',
+        'toCuanId': partnerId,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) {
+        _controller.clear();
+        _showMessage(context, 'Permintaan CP dikirim.');
+      }
+    } catch (_) {
+      if (mounted) _showMessage(context, 'Permintaan CP gagal dikirim.');
+    }
+  }
+
+  Future<void> _respond(String requestId, bool accept) async {
+    try {
+      await FirebaseFirestore.instance.collection('cp_requests').doc(requestId).update({
+        'status': accept ? 'accepted' : 'declined',
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) {
+        _showMessage(context, accept ? 'CP berhasil diterima.' : 'Permintaan CP ditolak.');
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Gagal memproses permintaan CP.');
+    }
+  }
+
+  Widget _incomingRequests(String cuanId) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('cp_requests')
+          .where('toCuanId', isEqualTo: cuanId)
+          .where('status', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError || snapshot.data == null || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 14),
+            const Text('PERMINTAAN CP', style: TextStyle(color: _C.brown, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            ...snapshot.data!.docs.map((doc) {
+              final data = doc.data();
+              final name = '${data['fromName'] ?? 'User'}'.trim();
+              final fromId = '${data['fromCuanId'] ?? ''}'.trim();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _LuxuryCard(
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: Color(0xFFFFD6E5),
+                        child: Icon(Icons.favorite_rounded, color: Colors.pinkAccent),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name.isEmpty ? 'User' : name,
+                                style: const TextStyle(color: _C.text, fontWeight: FontWeight.w900)),
+                            if (fromId.isNotEmpty)
+                              Text('ID: $fromId', style: const TextStyle(color: _C.muted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Tolak',
+                        onPressed: () => _respond(doc.id, false),
+                        icon: const Icon(Icons.close_rounded, color: Colors.redAccent),
+                      ),
+                      IconButton(
+                        tooltip: 'Terima',
+                        onPressed: () => _respond(doc.id, true),
+                        icon: const Icon(Icons.check_circle_rounded, color: Colors.green),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SubPage(
+      title: 'CP',
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _LuxuryCard(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              children: [
+                const Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 54),
+                const SizedBox(height: 10),
+                const Text('PASANG CP', style: TextStyle(color: _C.text, fontSize: 22, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                const Text('Masukkan CUAN ID pasangan untuk mengirim permintaan CP.', textAlign: TextAlign.center, style: TextStyle(color: _C.muted)),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: _controller,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'CUAN ID pasangan',
+                    hintText: 'Contoh: 1000110',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _bind,
+                    icon: const Icon(Icons.favorite_rounded),
+                    label: const Text('BIND CP'),
+                    style: FilledButton.styleFrom(backgroundColor: _C.brown),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            future: FirebaseFirestore.instance
+                .collection('users')
+                .doc(FirebaseAuth.instance.currentUser?.uid)
+                .get(),
+            builder: (context, snapshot) {
+              final cuanId = '${snapshot.data?.data()?['cuanId'] ?? ''}'.trim();
+              if (cuanId.isEmpty) return const SizedBox.shrink();
+              return _incomingRequests(cuanId);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class RankingPage extends StatefulWidget {
   final String type;
   const RankingPage({super.key, required this.type});
@@ -5629,29 +6036,20 @@ class RankingPage extends StatefulWidget {
 }
 
 class _RankingPageState extends State<RankingPage> {
-  late Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-  }
-
-  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _load() async {
-    final snap = await FirebaseFirestore.instance
+  Stream<QuerySnapshot<Map<String, dynamic>>> _stream() {
+    return FirebaseFirestore.instance
         .collection('cp_rankings')
         .orderBy('points', descending: true)
         .limit(50)
-        .get();
-    return snap.docs;
+        .snapshots();
   }
 
   @override
   Widget build(BuildContext context) {
     return _SubPage(
       title: 'CP Ranking',
-      child: FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-        future: _future,
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _stream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -5659,22 +6057,27 @@ class _RankingPageState extends State<RankingPage> {
           if (snapshot.hasError) {
             return const Center(child: Padding(padding: EdgeInsets.all(24), child: _EmptyStateCard(message: 'CP Ranking belum tersedia dari backend.')));
           }
-          final docs = snapshot.data ?? const [];
+          final docs = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
           if (docs.isEmpty) {
             return const Center(child: Padding(padding: EdgeInsets.all(24), child: _EmptyStateCard(message: 'Belum ada pasangan yang terdaftar di CP Ranking.')));
           }
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              const _LuxuryCard(padding: EdgeInsets.all(22), child: Column(children: [
-                Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 48),
-                SizedBox(height: 8),
-                Text('CP RANKING', style: TextStyle(color: _C.text, fontSize: 24, fontWeight: FontWeight.w900)),
-                SizedBox(height: 4),
-                Text('Ranking pasangan berdasarkan data CP.', style: TextStyle(color: _C.muted)),
-              ])),
-              const SizedBox(height: 14),
-              ...docs.asMap().entries.map((entry) {
+              const _LuxuryCard(
+                padding: EdgeInsets.all(22),
+                child: Column(children: [
+                  Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 48),
+                  SizedBox(height: 8),
+                  Text('CP RANKING', style: TextStyle(color: _C.text, fontSize: 24, fontWeight: FontWeight.w900)),
+                  SizedBox(height: 4),
+                  Text('Ranking pasangan berdasarkan data CP.', style: TextStyle(color: _C.muted)),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              _CpPodium(docs: docs.take(3).toList()),
+              const SizedBox(height: 16),
+              ...docs.asMap().entries.skip(3).map((entry) {
                 final rank = entry.key + 1;
                 final data = entry.value.data();
                 final name = '${data['name'] ?? data['coupleName'] ?? 'CP'}';
@@ -5694,6 +6097,70 @@ class _RankingPageState extends State<RankingPage> {
           );
         },
       ),
+    );
+  }
+}
+
+
+class _CpPodium extends StatelessWidget {
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
+  const _CpPodium({required this.docs});
+
+  @override
+  Widget build(BuildContext context) {
+    final order = [1, 0, 2];
+    return SizedBox(
+      height: 245,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (final position in order)
+            Expanded(
+              child: position < docs.length
+                  ? _podiumItem(position + 1, docs[position].data())
+                  : const SizedBox(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _podiumItem(int rank, Map<String, dynamic> data) {
+    final name = '${data['name'] ?? data['coupleName'] ?? 'CP'}';
+    final points = data['points'] ?? data['cpPoints'] ?? 0;
+    final height = rank == 1 ? 155.0 : 115.0;
+    final icon = rank == 1 ? Icons.emoji_events_rounded : Icons.workspace_premium_rounded;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        CircleAvatar(
+          radius: rank == 1 ? 34 : 28,
+          backgroundColor: _C.gold2,
+          child: Icon(icon, color: _C.brown, size: rank == 1 ? 34 : 28),
+        ),
+        const SizedBox(height: 6),
+        Text('Rank $rank', style: const TextStyle(color: _C.text, fontWeight: FontWeight.w900)),
+        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.muted, fontSize: 11)),
+        const SizedBox(height: 5),
+        Container(
+          height: height,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: _C.surface2,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            border: Border.all(color: _C.gold),
+          ),
+          alignment: Alignment.center,
+          child: RotatedBox(
+            quarterTurns: 0,
+            child: Text(
+              _formatRankingValue(points),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _C.brown, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -5895,6 +6362,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   return;
                 }
                 try {
+                  final currentUser = FirebaseAuth.instance.currentUser;
                   await FirebaseFirestore.instance.collection('users').doc(uid).set({
                     'displayName': newName,
                     'age': _age.text.trim(),
@@ -5903,6 +6371,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     'gender': _gender,
                     'updatedAt': FieldValue.serverTimestamp(),
                   }, SetOptions(merge: true));
+
+                  if (currentUser != null && currentUser.displayName != newName) {
+                    await currentUser.updateDisplayName(newName);
+                  }
+
                   AppProfileState.name.value = newName;
                   AppProfileState.age.value = _age.text.trim();
                   AppProfileState.country.value = _country.text.trim();
@@ -5911,8 +6384,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   if (!mounted) return;
                   Navigator.pop(context);
                   _showMessage(context, 'Profil berhasil disimpan.');
-                } catch (_) {
-                  _showMessage(context, 'Profil gagal disimpan. Coba lagi.');
+                } on FirebaseException catch (e) {
+                  if (mounted) {
+                    _showMessage(
+                      context,
+                      'Gagal menyimpan profil: ${e.code}',
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    _showMessage(context, 'Gagal menyimpan profil: $e');
+                  }
                 }
               },
               child: const Text(
@@ -6559,11 +7041,12 @@ class GameHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final games = [
-      ('Lucky Dice', Icons.casino_rounded),
-      ('Card Battle', Icons.style_rounded),
-      ('Spin Wheel', Icons.settings_backup_restore_rounded),
-      ('Quiz Room', Icons.help_outline_rounded),
-      ('Guess Song', Icons.headphones_rounded),
+      ('Ludo', Icons.sports_esports_rounded),
+      ('Monster Crush', Icons.extension_rounded),
+      ('UNO', Icons.style_rounded),
+      ('Carrom', Icons.circle_rounded),
+      ('Domino', Icons.grid_view_rounded),
+      ('Jackaroo', Icons.groups_rounded),
     ];
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -6628,10 +7111,9 @@ class GameHubPage extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _LuxuryCard(
                 onTap: () {
-                  LevelProgressStore.add('Game', 1000);
                   _showMessage(
                     context,
-                    '${game.$1} dibuka. +1,000 Game EXP.',
+                    '${game.$1} akan terhubung ke modul game.',
                   );
                 },
                 child: Row(
