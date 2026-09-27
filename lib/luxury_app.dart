@@ -4310,259 +4310,348 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return const Center(
+        child: Text(
+          'Silakan login terlebih dahulu.',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? <String, dynamic>{};
+
+        final name =
+            '${data['displayName'] ?? user.displayName ?? ''}'.trim();
+
+        final cuanId = '${data['cuanId'] ?? ''}'.trim();
+
+        final photoUrl =
+            '${data['photoUrl'] ?? user.photoURL ?? ''}'.trim();
+
+        final levelValue = data['level'];
+        final level = levelValue is num
+            ? levelValue.toInt().clamp(1, 999)
+            : 1;
+
+        final coinValue = data['coin'];
+        final coin = coinValue is num ? coinValue.toInt() : 0;
+
+        final diamondValue = data['diamond'];
+        final diamond = diamondValue is num ? diamondValue.toInt() : 0;
+
+        final vipValue = data['vip'];
+        final vip = vipValue is num ? vipValue.toInt() : 0;
+
+        final svipValue = data['svip'];
+        final svip = svipValue is num ? svipValue.toInt() : 0;
+
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             children: [
-              const CircleAvatar(
-                radius: 43,
-                backgroundColor: _C.gold2,
-                child: Icon(
-                  Icons.person,
-                  color: _C.brown,
-                  size: 48,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: ValueListenableBuilder<String>(
-                  valueListenable: AppProfileState.name,
-                  builder: (context, profileName, _) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profileName.isEmpty ? 'Nama belum diatur' : profileName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 43,
+                    backgroundColor: _C.gold2,
+                    backgroundImage: photoUrl.isNotEmpty
+                        ? NetworkImage(photoUrl)
+                        : null,
+                    child: photoUrl.isEmpty
+                        ? const Icon(
+                            Icons.person,
+                            color: _C.brown,
+                            size: 48,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name.isEmpty ? 'Nama belum diatur' : name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      ValueListenableBuilder<String>(
-                        valueListenable: AppProfileState.cuanId,
-                        builder: (_, id, __) => Text(
-                          id.isEmpty ? 'CUAN ID belum tersedia' : 'ID: $id',
+                        const SizedBox(height: 4),
+                        Text(
+                          cuanId.isEmpty
+                              ? 'CUAN ID belum tersedia'
+                              : 'ID: $cuanId',
                           style: const TextStyle(
                             color: Color(0xFFF6E5C5),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 7),
-                      ValueListenableBuilder<int>(
-                        valueListenable: AppProfileState.level,
-                        builder: (_, level, __) => Text(
-                          'Level ${level < 1 ? 1 : level}',
+                        const SizedBox(height: 7),
+                        Text(
+                          'Level $level',
                           style: const TextStyle(
                             color: Color(0xFFF6E5C5),
                             fontSize: 12,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EditProfilePage(),
+                      ),
+                    ),
+                    child: const Text(
+                      'Edit Profil',
+                      style: TextStyle(
+                        color: _C.gold2,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              _LuxuryCard(
+                child: Row(
+                  children: [
+                    _Stat('$coin', 'Coin'),
+                    _Stat('$diamond', 'Diamond'),
+                    _Stat('$vip', 'VIP'),
+                    _Stat('$svip', 'SVIP'),
+                  ],
                 ),
               ),
-              TextButton(
-                onPressed: () => Navigator.push(
+
+              const SizedBox(height: 14),
+
+              _LuxuryCard(
+                child: Row(
+                  children: const [
+                    _Stat('0', 'Pengunjung'),
+                    _Stat('0', 'Mengikuti'),
+                    _Stat('0', 'Pengikut'),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              _LuxuryCard(
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const EditProfilePage(),
+                    builder: (_) => const WalletPage(),
                   ),
                 ),
-                child: const Text(
-                  'Edit Profil',
-                  style: TextStyle(
-                    color: _C.gold2,
-                    fontWeight: FontWeight.w900,
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _C.surface2,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: _C.gold,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Dompet',
+                            style: TextStyle(
+                              color: _C.text,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Coin & Diamond realtime',
+                            style: TextStyle(
+                              color: _C.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: _C.muted,
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _LuxuryCard(
-            child: Row(
-              children: const [
-                _Stat('36', 'Pengunjung'),
-                _Stat('8', 'Mengikuti'),
-                _Stat('12', 'Pengikut'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _LuxuryCard(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const WalletPage(),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _C.surface2,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: _C.gold,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Dompet',
-                        style: TextStyle(
-                          color: _C.text,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
+
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _ProfileShortcut(
+                      Icons.assignment_rounded,
+                      'Tugas',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TasksPage(),
                         ),
                       ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Coin & Diamond',
-                        style: TextStyle(
-                          color: _C.muted,
-                          fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ProfileShortcut(
+                      Icons.auto_awesome_rounded,
+                      'Level',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const LevelPage(),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: _C.muted,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _ProfileShortcut(
-                  Icons.assignment_rounded,
-                  'Tugas',
-                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksPage())),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ProfileShortcut(
-                  Icons.auto_awesome_rounded,
-                  'Level',
-                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LevelPage())),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ProfileShortcut(
-                  Icons.storefront_rounded,
-                  'Toko',
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const StorePage(),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ProfileShortcut(
+                      Icons.storefront_rounded,
+                      'Toko',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const StorePage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ProfileShortcut(
+                      Icons.workspace_premium_rounded,
+                      'Medal',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BadgePage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _ProfileShortcut(
+                      Icons.diamond_rounded,
+                      'SVIP',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const VipPage(kind: 'SVIP'),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ProfileShortcut(
+                      Icons.verified_rounded,
+                      'VIP',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const VipPage(kind: 'VIP'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              _ProfileRow(
+                'Undangan',
+                Icons.person_add_alt_1_rounded,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const InvitationPage(),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ProfileShortcut(
-                  Icons.workspace_premium_rounded,
-                  'Medal',
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const BadgePage(),
-                    ),
+
+              _ProfileRow(
+                'CP',
+                Icons.favorite_rounded,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CouplePage(),
+                  ),
+                ),
+              ),
+
+              _ProfileRow(
+                'Customer Service Room',
+                Icons.support_agent_rounded,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CustomerServicePage(),
+                  ),
+                ),
+              ),
+
+              _ProfileRow(
+                'Pengaturan',
+                Icons.settings_rounded,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SettingsPage(),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _ProfileShortcut(
-                  Icons.diamond_rounded,
-                  'SVIP',
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VipPage(kind: 'SVIP'),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ProfileShortcut(
-                  Icons.verified_rounded,
-                  'VIP',
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VipPage(kind: 'VIP'),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _ProfileRow(
-            'Undangan',
-            Icons.person_add_alt_1_rounded,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvitationPage())),
-          ),
-          _ProfileRow(
-            'CP',
-            Icons.favorite_rounded,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const CouplePage(),
-              ),
-            ),
-          ),
-          _ProfileRow(
-            'Customer Service Room',
-            Icons.support_agent_rounded,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerServicePage())),
-          ),
-          _ProfileRow(
-            'Pengaturan',
-            Icons.settings_rounded,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const SettingsPage(),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
-
 class _Stat extends StatelessWidget {
   final String value;
   final String label;
