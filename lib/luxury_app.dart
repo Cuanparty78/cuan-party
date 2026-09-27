@@ -4336,7 +4336,267 @@ class AppProfileState {
   static final ValueNotifier<DateTime?> vipExpiresAt = ValueNotifier<DateTime?>(null);
   static final ValueNotifier<String?> vipCheckinClaimedDate = ValueNotifier<String?>(null);
 }
+class ProfileViewPage extends StatelessWidget {
+  final String userId;
 
+  const ProfileViewPage({
+    super.key,
+    required this.userId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _C.bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final data = snapshot.data?.data();
+
+          if (data == null) {
+            return const Center(
+              child: Text(
+                'Profil tidak ditemukan',
+                style: TextStyle(color: Colors.white),
+              ),
+            );
+          }
+
+          final name = '${data['displayName'] ?? 'User'}'.trim();
+          final cuanId = '${data['cuanId'] ?? ''}'.trim();
+          final photoUrl = '${data['photoUrl'] ?? ''}'.trim();
+
+          final wealthValue = data['wealthLevel'];
+          final wealthLevel = wealthValue is num
+              ? wealthValue.toInt().clamp(1, 120)
+              : 1;
+
+          final charmValue = data['charmLevel'];
+          final charmLevel = charmValue is num
+              ? charmValue.toInt().clamp(1, 120)
+              : 1;
+
+          final gameValue = data['gameLevel'];
+          final gameLevel = gameValue is num
+              ? gameValue.toInt().clamp(1, 120)
+              : 1;
+
+          final vipValue = data['vip'];
+          final vip = vipValue is num ? vipValue.toInt() : 0;
+
+          final svipValue = data['svip'];
+          final svip = svipValue is num ? svipValue.toInt() : 0;
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+            children: [
+              Center(
+                child: CircleAvatar(
+                  radius: 55,
+                  backgroundColor: _C.gold2,
+                  backgroundImage: photoUrl.isNotEmpty
+                      ? NetworkImage(photoUrl)
+                      : null,
+                  child: photoUrl.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          color: _C.brown,
+                          size: 55,
+                        )
+                      : null,
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              Center(
+                child: Text(
+                  name.isEmpty ? 'User' : name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              Center(
+                child: Text(
+                  cuanId.isEmpty ? 'CUAN ID' : 'ID: $cuanId',
+                  style: const TextStyle(
+                    color: Color(0xFFF6E5C5),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _ProfileLevelBar(
+                      icon: '🪙',
+                      title: 'WEALTH',
+                      level: wealthLevel,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _ProfileLevelBar(
+                      icon: '💖',
+                      title: 'CHARM',
+                      level: charmLevel,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _ProfileLevelBar(
+                      icon: '🎮',
+                      title: 'GAME',
+                      level: gameLevel,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              _LuxuryCard(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _ProfileInfoItem(
+                        value: '$vip',
+                        label: 'VIP',
+                      ),
+                    ),
+                    Expanded(
+                      child: _ProfileInfoItem(
+                        value: '$svip',
+                        label: 'SVIP',
+                      ),
+                    ),
+                    const Expanded(
+                      child: _ProfileInfoItem(
+                        value: '0',
+                        label: 'Pengikut',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProfileLevelBar extends StatelessWidget {
+  final String icon;
+  final String title;
+  final int level;
+
+  const _ProfileLevelBar({
+    required this.icon,
+    required this.title,
+    required this.level,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 5,
+        vertical: 8,
+      ),
+      decoration: BoxDecoration(
+        color: _getLevelTierColor(level),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '$icon LV $level',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileInfoItem extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _ProfileInfoItem({
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: _C.gold2,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: const TextStyle(
+            color: _C.muted,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+}
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
@@ -4406,20 +4666,32 @@ final gameLevel = gameValue is num
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 43,
-                    backgroundColor: _C.gold2,
-                    backgroundImage: photoUrl.isNotEmpty
-                        ? NetworkImage(photoUrl)
-                        : null,
-                    child: photoUrl.isEmpty
-                        ? const Icon(
-                            Icons.person,
-                            color: _C.brown,
-                            size: 48,
-                          )
-                        : null,
-                  ),
+                  GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileViewPage(
+          userId: user.uid,
+        ),
+      ),
+    );
+  },
+  child: CircleAvatar(
+    radius: 43,
+    backgroundColor: _C.gold2,
+    backgroundImage: photoUrl.isNotEmpty
+        ? NetworkImage(photoUrl)
+        : null,
+    child: photoUrl.isEmpty
+        ? const Icon(
+            Icons.person,
+            color: _C.brown,
+            size: 48,
+          )
+        : null,
+  ),
+),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
