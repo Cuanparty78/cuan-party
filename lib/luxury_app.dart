@@ -4387,7 +4387,8 @@ class ProfileViewPage extends StatelessWidget {
           final name = '${data['displayName'] ?? 'User'}'.trim();
           final cuanId = '${data['cuanId'] ?? ''}'.trim();
           final photoUrl = '${data['photoUrl'] ?? ''}'.trim();
-
+final gender = '${data['gender'] ?? ''}'.trim();
+final country = '${data['country'] ?? ''}'.trim();
           final wealthValue = data['wealthLevel'];
           final wealthLevel = wealthValue is num
               ? wealthValue.toInt().clamp(1, 120)
@@ -4408,7 +4409,10 @@ class ProfileViewPage extends StatelessWidget {
 
           final svipValue = data['svip'];
           final svip = svipValue is num ? svipValue.toInt() : 0;
-
+final currentUser = FirebaseAuth.instance.currentUser;
+final isSelf = currentUser?.uid == userId;
+          final vipLabel = vip > 0 ? '💎 VIP $vip' : '';
+final svipLabel = svip > 0 ? '👑 SVIP $svip' : '';
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
             children: [
@@ -4444,6 +4448,67 @@ class ProfileViewPage extends StatelessWidget {
 
               const SizedBox(height: 5),
 
+if (vipLabel.isNotEmpty || svipLabel.isNotEmpty)
+  Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      if (vipLabel.isNotEmpty)
+        Text(
+          vipLabel,
+          style: const TextStyle(
+            color: _C.gold2,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      if (vipLabel.isNotEmpty && svipLabel.isNotEmpty)
+        const SizedBox(width: 8),
+      if (svipLabel.isNotEmpty)
+        Text(
+          svipLabel,
+          style: const TextStyle(
+            color: _C.gold2,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+    ],
+  ),
+
+const SizedBox(height: 5),
+Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    if (gender.isNotEmpty)
+      Text(
+        gender,
+        style: const TextStyle(
+          color: Color(0xFFF6E5C5),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    if (gender.isNotEmpty && country.isNotEmpty)
+      const Text(
+        '  •  ',
+        style: TextStyle(
+          color: _C.gold2,
+          fontSize: 12,
+        ),
+      ),
+    if (country.isNotEmpty)
+      Text(
+        country,
+        style: const TextStyle(
+          color: Color(0xFFF6E5C5),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+  ],
+),
+
+const SizedBox(height: 8),
               Row(
   mainAxisAlignment: MainAxisAlignment.center,
   children: [
@@ -4519,13 +4584,13 @@ class ProfileViewPage extends StatelessWidget {
                     Expanded(
                       child: _ProfileInfoItem(
                         value: '$vip',
-                        label: 'VIP',
+                        label: 'VIP LEVEL',
                       ),
                     ),
                     Expanded(
                       child: _ProfileInfoItem(
                         value: '$svip',
-                        label: 'SVIP',
+                        label: 'SVIP LEVEL',
                       ),
                     ),
                     const Expanded(
