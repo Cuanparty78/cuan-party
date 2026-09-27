@@ -21,6 +21,9 @@ class UserService {
         'coin': 0,
         'diamond': 0,
         'level': 1,
+        'wealthLevel': 1,
+        'charmLevel': 1,
+        'gameLevel': 1,
         'vip': 0,
         'svip': 0,
         'svipPoints': 0,
@@ -49,6 +52,9 @@ class UserService {
         (data['level'] is num && (data['level'] as num).toInt() < 1)) {
       patch['level'] = 1;
     }
+    if (data['wealthLevel'] == null) patch['wealthLevel'] = 1;
+    if (data['charmLevel'] == null) patch['charmLevel'] = 1;
+    if (data['gameLevel'] == null) patch['gameLevel'] = 1;
     if (data['vip'] == null) patch['vip'] = 0;
     if (data['svip'] == null) patch['svip'] = 0;
     if (data['svipPoints'] == null) patch['svipPoints'] = 0;
