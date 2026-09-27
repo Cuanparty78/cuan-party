@@ -4602,6 +4602,65 @@ const SizedBox(height: 8),
                   ],
                 ),
               ),
+                            if (!isSelf) ...[
+                const SizedBox(height: 18),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Follow segera tersedia'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.person_add_alt_1),
+                        label: const Text('Follow'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _C.gold,
+                          foregroundColor: _C.brown,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 13,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Chat segera tersedia'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        label: const Text('Message'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _C.gold2,
+                          side: const BorderSide(
+                            color: _C.gold2,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 13,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           );
         },
