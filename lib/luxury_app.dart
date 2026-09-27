@@ -142,6 +142,22 @@ _LevelTier _getLevelTier(int level) {
   if (level <= 100) return _LevelTier.tier5;
   return _LevelTier.tier6;
 }
+Color _getLevelTierColor(int level) {
+  switch (_getLevelTier(level)) {
+    case _LevelTier.tier1:
+      return const Color(0xFFD4AF37);
+    case _LevelTier.tier2:
+      return const Color(0xFFE8C97A);
+    case _LevelTier.tier3:
+      return const Color(0xFFB89B5E);
+    case _LevelTier.tier4:
+      return const Color(0xFFC0C0C0);
+    case _LevelTier.tier5:
+      return const Color(0xFF9E7B3C);
+    case _LevelTier.tier6:
+      return const Color(0xFFFFD76A);
+  }
+}
 final ImageProvider _cuanPalaceBackground =
     MemoryImage(base64Decode(_cuanPalaceBgBase64));
 
