@@ -4373,7 +4373,20 @@ class ProfilePage extends StatelessWidget {
         final level = levelValue is num
             ? levelValue.toInt().clamp(1, 999)
             : 1;
+final wealthValue = data['wealthLevel'];
+final wealthLevel = wealthValue is num
+    ? wealthValue.toInt().clamp(1, 120)
+    : 1;
 
+final charmValue = data['charmLevel'];
+final charmLevel = charmValue is num
+    ? charmValue.toInt().clamp(1, 120)
+    : 1;
+
+final gameValue = data['gameLevel'];
+final gameLevel = gameValue is num
+    ? gameValue.toInt().clamp(1, 120)
+    : 1;
         final coinValue = data['coin'];
         final coin = coinValue is num ? coinValue.toInt() : 0;
 
