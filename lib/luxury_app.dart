@@ -4935,17 +4935,7 @@ final gameLevel = gameValue is num
 
               const SizedBox(height: 18),
 
-              _LuxuryCard(
-                child: Row(
-                  children: [
-                    _Stat('$coin', 'Coin'),
-                    _Stat('$diamond', 'Diamond'),
-                    _Stat('$vip', 'VIP'),
-                    _Stat('$svip', 'SVIP'),
-                  ],
-                ),
-              ),
-
+              
               const SizedBox(height: 14),
 
               _LuxuryCard(
