@@ -4444,15 +4444,42 @@ class ProfileViewPage extends StatelessWidget {
 
               const SizedBox(height: 5),
 
-              Center(
-                child: Text(
-                  cuanId.isEmpty ? 'CUAN ID' : 'ID: $cuanId',
-                  style: const TextStyle(
-                    color: Color(0xFFF6E5C5),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+              Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    Text(
+      cuanId.isEmpty ? 'CUAN ID' : 'ID: $cuanId',
+      style: const TextStyle(
+        color: Color(0xFFF6E5C5),
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+    if (cuanId.isNotEmpty) ...[
+      const SizedBox(width: 6),
+      GestureDetector(
+        onTap: () async {
+          await Clipboard.setData(
+            ClipboardData(text: cuanId),
+          );
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('CUAN ID berhasil disalin'),
+                duration: Duration(seconds: 1),
               ),
+            );
+          }
+        },
+        child: const Icon(
+          Icons.copy_rounded,
+          color: _C.gold2,
+          size: 17,
+        ),
+      ),
+    ],
+  ],
+),
 
               const SizedBox(height: 20),
 
