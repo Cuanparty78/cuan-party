@@ -4354,335 +4354,223 @@ class ProfileViewPage extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'Profile',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .snapshots(),
+        stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           final data = snapshot.data?.data();
-
           if (data == null) {
             return const Center(
-              child: Text(
-                'Profil tidak ditemukan',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: Text('Profil tidak ditemukan', style: TextStyle(color: Colors.white)),
             );
           }
 
           final name = '${data['displayName'] ?? 'User'}'.trim();
           final cuanId = '${data['cuanId'] ?? ''}'.trim();
           final photoUrl = '${data['photoUrl'] ?? ''}'.trim();
-final gender = '${data['gender'] ?? ''}'.trim();
-final country = '${data['country'] ?? ''}'.trim();
-          final wealthValue = data['wealthLevel'];
-          final wealthLevel = wealthValue is num
-              ? wealthValue.toInt().clamp(1, 120)
-              : 1;
+          final frameUrl = '${data['frameUrl'] ?? ''}'.trim();
+          final gender = '${data['gender'] ?? ''}'.trim();
+          final country = '${data['country'] ?? ''}'.trim();
 
-          final charmValue = data['charmLevel'];
-          final charmLevel = charmValue is num
-              ? charmValue.toInt().clamp(1, 120)
-              : 1;
+          int level(dynamic value) => value is num ? value.toInt().clamp(1, 120) : 1;
+          final wealthLevel = level(data['wealthLevel']);
+          final charmLevel = level(data['charmLevel']);
+          final gameLevel = level(data['gameLevel']);
 
-          final gameValue = data['gameLevel'];
-          final gameLevel = gameValue is num
-              ? gameValue.toInt().clamp(1, 120)
-              : 1;
+          final rawBadges = data['badges'];
+          final badges = rawBadges is List
+              ? rawBadges.map((e) => '$e').where((e) => e.trim().isNotEmpty).take(10).toList()
+              : <String>[];
 
-          final vipValue = data['vip'];
-          final vip = vipValue is num ? vipValue.toInt() : 0;
+          final followerCount = data['followersCount'] is num
+              ? (data['followersCount'] as num).toInt()
+              : 0;
+          final followingCount = data['followingCount'] is num
+              ? (data['followingCount'] as num).toInt()
+              : 0;
+          final visitorCount = data['visitorsCount'] is num
+              ? (data['visitorsCount'] as num).toInt()
+              : 0;
 
-          final svipValue = data['svip'];
-          final svip = svipValue is num ? svipValue.toInt() : 0;
-final currentUser = FirebaseAuth.instance.currentUser;
-final isSelf = currentUser?.uid == userId;
-          final vipLabel = vip > 0 ? '💎 VIP $vip' : '';
-final svipLabel = svip > 0 ? '👑 SVIP $svip' : '';
           return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
             children: [
+              // Avatar + Frame
               Center(
-                child: CircleAvatar(
-                  radius: 55,
-                  backgroundColor: _C.gold2,
-                  backgroundImage: photoUrl.isNotEmpty
-                      ? NetworkImage(photoUrl)
-                      : null,
-                  child: photoUrl.isEmpty
-                      ? const Icon(
-                          Icons.person,
-                          color: _C.brown,
-                          size: 55,
-                        )
-                      : null,
+                child: SizedBox(
+                  width: 132,
+                  height: 132,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 51,
+                        backgroundColor: _C.gold2,
+                        backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                        child: photoUrl.isEmpty
+                            ? const Icon(Icons.person, color: _C.brown, size: 52)
+                            : null,
+                      ),
+                      if (frameUrl.isNotEmpty)
+                        IgnorePointer(
+                          child: Image.network(
+                            frameUrl,
+                            width: 132,
+                            height: 132,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-
-              const SizedBox(height: 14),
+              const SizedBox(height: 4),
 
               Center(
                 child: Text(
                   name.isEmpty ? 'User' : name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                 ),
               ),
-
               const SizedBox(height: 5),
 
-
-Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    if (gender.isNotEmpty)
-      Text(
-        gender,
-        style: const TextStyle(
-          color: Color(0xFFF6E5C5),
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    if (gender.isNotEmpty && country.isNotEmpty)
-      const Text(
-        '  •  ',
-        style: TextStyle(
-          color: _C.gold2,
-          fontSize: 12,
-        ),
-      ),
-    if (country.isNotEmpty)
-      Text(
-        country,
-        style: const TextStyle(
-          color: Color(0xFFF6E5C5),
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-  ],
-),
-
-const SizedBox(height: 8),
               Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    Text(
-      cuanId.isEmpty ? 'CUAN ID' : 'ID: $cuanId',
-      style: const TextStyle(
-        color: Color(0xFFF6E5C5),
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-    if (cuanId.isNotEmpty) ...[
-      const SizedBox(width: 6),
-      GestureDetector(
-        onTap: () async {
-          await Clipboard.setData(
-            ClipboardData(text: cuanId),
-          );
-
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('CUAN ID berhasil disalin'),
-                duration: Duration(seconds: 1),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (gender.isNotEmpty)
+                    Text(gender, style: const TextStyle(color: Color(0xFFF6E5C5), fontSize: 12, fontWeight: FontWeight.w600)),
+                  if (gender.isNotEmpty && country.isNotEmpty)
+                    const Text('  •  ', style: TextStyle(color: _C.gold2, fontSize: 12)),
+                  if (country.isNotEmpty)
+                    Text(country, style: const TextStyle(color: Color(0xFFF6E5C5), fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
               ),
-            );
-          }
-        },
-        child: const Icon(
-          Icons.copy_rounded,
-          color: _C.gold2,
-          size: 17,
-        ),
-      ),
-    ],
-  ],
-),
+              const SizedBox(height: 7),
 
-              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    cuanId.isEmpty ? 'CUAN ID' : 'ID: $cuanId',
+                    style: const TextStyle(color: Color(0xFFF6E5C5), fontWeight: FontWeight.w700),
+                  ),
+                  if (cuanId.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () async {
+                        await Clipboard.setData(ClipboardData(text: cuanId));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('CUAN ID berhasil disalin'), duration: Duration(seconds: 1)),
+                          );
+                        }
+                      },
+                      child: const Icon(Icons.copy_rounded, color: _C.gold2, size: 16),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 18),
 
               Row(
                 children: [
-                  Expanded(
-                    child: _ProfileLevelBar(
-                      icon: '🪙',
-                      title: 'WEALTH',
-                      level: wealthLevel,
-                    ),
-                  ),
+                  Expanded(child: _ProfileLevelBar(icon: '🪙', title: 'WEALTH', level: wealthLevel)),
                   const SizedBox(width: 6),
-                  Expanded(
-                    child: _ProfileLevelBar(
-                      icon: '💖',
-                      title: 'CHARM',
-                      level: charmLevel,
-                    ),
-                  ),
+                  Expanded(child: _ProfileLevelBar(icon: '💖', title: 'CHARM', level: charmLevel)),
                   const SizedBox(width: 6),
-                  Expanded(
-                    child: _ProfileLevelBar(
-                      icon: '🎮',
-                      title: 'GAME',
-                      level: gameLevel,
-                    ),
-                  ),
+                  Expanded(child: _ProfileLevelBar(icon: '🎮', title: 'GAME', level: gameLevel)),
                 ],
               ),
-
               const SizedBox(height: 18),
 
               _LuxuryCard(
                 child: Row(
                   children: [
-                    Expanded(
-                      child: _ProfileInfoItem(
-                        value: '$vip',
-                        label: 'VIP LEVEL',
-                      ),
-                    ),
-                    Expanded(
-                      child: _ProfileInfoItem(
-                        value: '$svip',
-                        label: 'SVIP LEVEL',
-                      ),
-                    ),
-                    const Expanded(
-                      child: _ProfileInfoItem(
-                        value: '0',
-                        label: 'Pengikut',
-                      ),
-                    ),
+                    Expanded(child: _ProfileInfoItem(value: '$followerCount', label: 'Pengikut')),
+                    Expanded(child: _ProfileInfoItem(value: '$followingCount', label: 'Mengikuti')),
+                    Expanded(child: _ProfileInfoItem(value: '$visitorCount', label: 'Visitors')),
                   ],
                 ),
               ),
-                            if (!isSelf) ...[
-                const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
+              _ProfileSectionTitle(title: 'BADGE'),
+              const SizedBox(height: 10),
+              _BadgeGrid(badges: badges),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _showAllBadges(context, badges),
+                  icon: const Icon(Icons.chevron_right_rounded, color: _C.gold2),
+                  label: const Text('Lihat semua', style: TextStyle(color: _C.gold2, fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              _ProfileBottomTabs(userId: userId),
+
+              if (FirebaseAuth.instance.currentUser?.uid != userId) ...[
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
                       child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(userId)
-                            .collection('followers')
-                            .doc(FirebaseAuth.instance.currentUser?.uid)
-                            .snapshots(),
+                        stream: FirebaseFirestore.instance.collection('users').doc(userId).collection('followers').doc(FirebaseAuth.instance.currentUser?.uid).snapshots(),
                         builder: (context, followSnapshot) {
                           final isFollowing = followSnapshot.data?.exists ?? false;
-
                           return ElevatedButton.icon(
                             onPressed: () async {
                               final currentUser = FirebaseAuth.instance.currentUser;
                               if (currentUser == null) return;
-
                               final myUid = currentUser.uid;
-
-                              final followingRef = FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(myUid)
-                                  .collection('following')
-                                  .doc(userId);
-
-                              final followerRef = FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(userId)
-                                  .collection('followers')
-                                  .doc(myUid);
-
+                              final followingRef = FirebaseFirestore.instance.collection('users').doc(myUid).collection('following').doc(userId);
+                              final followerRef = FirebaseFirestore.instance.collection('users').doc(userId).collection('followers').doc(myUid);
                               try {
+                                final batch = FirebaseFirestore.instance.batch();
                                 if (isFollowing) {
-                                  final batch = FirebaseFirestore.instance.batch();
                                   batch.delete(followingRef);
                                   batch.delete(followerRef);
-                                  await batch.commit();
                                 } else {
-                                  final batch = FirebaseFirestore.instance.batch();
-                                  batch.set(followingRef, {
-                                    'userId': userId,
-                                    'createdAt': FieldValue.serverTimestamp(),
-                                  });
-                                  batch.set(followerRef, {
-                                    'userId': myUid,
-                                    'createdAt': FieldValue.serverTimestamp(),
-                                  });
-                                  await batch.commit();
+                                  batch.set(followingRef, {'userId': userId, 'createdAt': FieldValue.serverTimestamp()});
+                                  batch.set(followerRef, {'userId': myUid, 'createdAt': FieldValue.serverTimestamp()});
                                 }
+                                await batch.commit();
                               } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Gagal mengubah Follow: $e'),
-                                    ),
-                                  );
-                                }
+                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengubah Follow: $e')));
                               }
                             },
-                            icon: Icon(
-                              isFollowing
-                                  ? Icons.person_remove_alt_1
-                                  : Icons.person_add_alt_1,
-                            ),
-                            label: Text(
-                              isFollowing ? 'Following' : 'Follow',
-                            ),
+                            icon: Icon(isFollowing ? Icons.person_remove_alt_1 : Icons.person_add_alt_1),
+                            label: Text(isFollowing ? 'Following' : 'Follow'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isFollowing ? _C.brown2 : _C.gold,
                               foregroundColor: isFollowing ? Colors.white : _C.brown,
                               padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
                           );
                         },
                       ),
                     ),
-
                     const SizedBox(width: 10),
-
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Chat segera tersedia'),
-                            ),
-                          );
-                        },
+                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chat segera tersedia'))),
                         icon: const Icon(Icons.chat_bubble_outline),
                         label: const Text('Message'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _C.gold2,
-                          side: const BorderSide(
-                            color: _C.gold2,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 13,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                          side: const BorderSide(color: _C.gold2),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
                     ),
@@ -4695,6 +4583,140 @@ const SizedBox(height: 8),
       ),
     );
   }
+
+  static void _showAllBadges(BuildContext context, List<String> badges) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _C.bg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('My Badge Collection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 14),
+              if (badges.isEmpty)
+                const Text('Belum ada badge.', style: TextStyle(color: _C.muted))
+              else
+                Wrap(spacing: 10, runSpacing: 10, children: badges.map((b) => _BadgeTile(label: b, size: 58)).toList()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSectionTitle extends StatelessWidget {
+  final String title;
+  const _ProfileSectionTitle({required this.title});
+  @override
+  Widget build(BuildContext context) => Text(title, style: const TextStyle(color: _C.gold2, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.2));
+}
+
+class _BadgeGrid extends StatelessWidget {
+  final List<String> badges;
+  const _BadgeGrid({required this.badges});
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 10,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 8, mainAxisSpacing: 10, childAspectRatio: .88),
+      itemBuilder: (_, i) => _BadgeTile(label: i < badges.length ? badges[i] : '', size: 48),
+    );
+  }
+}
+
+class _BadgeTile extends StatelessWidget {
+  final String label;
+  final double size;
+  const _BadgeTile({required this.label, required this.size});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: label.isEmpty ? const Color(0xFF2A211A) : const Color(0xFF3A2B1B),
+            border: Border.all(color: label.isEmpty ? const Color(0xFF5A4732) : _C.gold2, width: 1.3),
+            boxShadow: label.isEmpty ? null : [BoxShadow(color: _C.gold.withOpacity(.18), blurRadius: 10)],
+          ),
+          child: label.isEmpty
+              ? const Icon(Icons.workspace_premium_outlined, color: Color(0xFF6D5A43), size: 22)
+              : Center(child: Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.gold2, fontSize: 9, fontWeight: FontWeight.w900))),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileBottomTabs extends StatelessWidget {
+  final String userId;
+  const _ProfileBottomTabs({required this.userId});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF211912),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF5B4935)),
+      ),
+      child: DefaultTabController(
+        length: 3,
+        child: Column(
+          children: [
+            const TabBar(
+              labelColor: _C.gold2,
+              unselectedLabelColor: _C.muted,
+              indicatorColor: _C.gold2,
+              indicatorSize: TabBarIndicatorSize.label,
+              tabs: [Tab(text: 'RELATIONSHIPS'), Tab(text: 'FRAME'), Tab(text: 'GIFT')],
+            ),
+            SizedBox(
+              height: 170,
+              child: TabBarView(
+                children: [
+                  _ProfileRelationshipPreview(userId: userId),
+                  _ProfileFramePreview(userId: userId),
+                  _ProfileGiftPreview(userId: userId),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileRelationshipPreview extends StatelessWidget {
+  final String userId;
+  const _ProfileRelationshipPreview({required this.userId});
+  @override
+  Widget build(BuildContext context) => const Center(child: Text('Relationships • sampai 5 pasangan/CP', style: TextStyle(color: _C.muted, fontSize: 12)));
+}
+
+class _ProfileFramePreview extends StatelessWidget {
+  final String userId;
+  const _ProfileFramePreview({required this.userId});
+  @override
+  Widget build(BuildContext context) => const Center(child: Text('Koleksi Frame • frame yang dimiliki user', style: TextStyle(color: _C.muted, fontSize: 12)));
+}
+
+class _ProfileGiftPreview extends StatelessWidget {
+  final String userId;
+  const _ProfileGiftPreview({required this.userId});
+  @override
+  Widget build(BuildContext context) => const Center(child: Text('Gift • hadiah yang diterima user', style: TextStyle(color: _C.muted, fontSize: 12)));
 }
 
 class _ProfileLevelBar extends StatelessWidget {
@@ -6140,7 +6162,7 @@ class _VipPageState extends State<VipPage> {
         SafeArea(child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 30),
           child: Column(children: [
-            Row(children: [IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _C.text)), const Expanded(child: Text('VIP', textAlign: TextAlign.center, style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))), const SizedBox(width: 48)]),
+            Row(children: [IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _C.text)), Expanded(child: Text(svip ? 'SVIP' : 'VIP', textAlign: TextAlign.center, style: const TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900))), const SizedBox(width: 48)]),
             SizedBox(
               height: 46,
               child: ListView.separated(
@@ -6168,11 +6190,13 @@ class _VipPageState extends State<VipPage> {
             if (svip) ...[
               _SvipStatusCard(level: level),
               const SizedBox(height: 14),
+              _SvipRulesCard(level: level),
+              const SizedBox(height: 14),
+            ] else ...[
+              _VipDailyCheckin(level: level),
+              const SizedBox(height: 14),
             ],
-            _VipDailyCheckin(level: level),
-
-const SizedBox(height: 14),
-            Text('Royal Privileges', style: const TextStyle(color: _C.gold2, fontSize: 20, fontWeight: FontWeight.w900)),
+            Text(svip ? 'SVIP Benefits' : 'VIP Benefits', style: const TextStyle(color: _C.gold2, fontSize: 20, fontWeight: FontWeight.w900)),
             Text('$count/$count', style: const TextStyle(color: _C.gold2, fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 12),
             GridView.builder(
@@ -6531,6 +6555,50 @@ class _SvipStatusCardState extends State<_SvipStatusCard> {
           const SizedBox(height: 8),
           const Text('Memuat status SVIP…', style: TextStyle(color: Color(0xFFE6D2B2), fontSize: 11)),
         ],
+      ]),
+    );
+  }
+}
+
+class _SvipRulesCard extends StatelessWidget {
+  final int level;
+  const _SvipRulesCard({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF24170E),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _C.gold.withOpacity(.45)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('FITUR KHUSUS SVIP', style: TextStyle(color: _C.gold2, fontSize: 16, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        const _SvipRuleRow(icon: Icons.diamond_rounded, text: 'Benefit dan fitur eksklusif khusus SVIP.'),
+        const _SvipRuleRow(icon: Icons.trending_up_rounded, text: 'Naik level berdasarkan SVIP Point dan target level.'),
+        const _SvipRuleRow(icon: Icons.timer_outlined, text: 'Progress mengikuti periode SVIP yang sedang berjalan.'),
+        const _SvipRuleRow(icon: Icons.trending_down_rounded, text: 'Penurunan level mengikuti aturan aktivitas SVIP.'),
+      ]),
+    );
+  }
+}
+
+class _SvipRuleRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _SvipRuleRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: _C.gold2, size: 18),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: const TextStyle(color: Color(0xFFE6D2B2), fontSize: 11.5, height: 1.35))),
       ]),
     );
   }
