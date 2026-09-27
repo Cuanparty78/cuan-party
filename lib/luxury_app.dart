@@ -4581,27 +4581,94 @@ const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Follow segera tersedia'),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.person_add_alt_1),
-                        label: const Text('Follow'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _C.gold,
-                          foregroundColor: _C.brown,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 13,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                      ),
+  child: StreamBuilder<
+      DocumentSnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('followers')
+        .doc(FirebaseAuth.instance.currentUser?.uid)
+        .snapshots(),
+    builder: (context, followSnapshot) {
+      final isFollowing = followSnapshot.data?.exists ?? false;
+
+      return ElevatedButton.icon(
+        onPressed: () async {
+          final currentUser =
+              FirebaseAuth.instance.currentUser;
+
+          if (currentUser == null) return;
+
+          final myUid = currentUser.uid;
+
+          final followingRef = FirebaseFirestore.instance
+              .collection('users')
+              .doc(myUid)
+              .collection('following')
+              .doc(userId);
+
+          final followerRef = FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('followers')
+              .doc(myUid);
+
+          try {
+            if (isFollowing) {
+              await followingRef.delete();
+              await followerRef.delete();
+            } else {
+              final batch =
+                  FirebaseFirestore.instance.batch();
+
+              batch.set(followingRef, {
+                'userId': userId,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+
+              batch.set(followerRef, {
+                'userId': myUid,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+
+              await batch.commit();
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Gagal mengubah Follow: $e',
+                  ),
+                ),
+              );
+            }
+          }
+        },
+        icon: Icon(
+          isFollowing
+              ? Icons.person_remove_alt_1
+              : Icons.person_add_alt_1,
+        ),
+        label: Text(
+          isFollowing ? 'Following' : 'Follow',
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+              isFollowing ? _C.brown2 : _C.gold,
+          foregroundColor:
+              isFollowing ? Colors.white : _C.brown,
+          padding: const EdgeInsets.symmetric(
+            vertical: 13,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      );
+    },
+  ),
+),
                     ),
 
                     const SizedBox(width: 10),
