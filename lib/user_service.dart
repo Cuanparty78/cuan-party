@@ -58,7 +58,9 @@ class UserService {
       await userRef.set(patch, SetOptions(merge: true));
     }
   }
-
+static Future<int> allocateCuanId() {
+  return _allocateCuanId();
+}
   static Future<int> _allocateCuanId() async {
     final counterRef = _db.collection('meta').doc('cuan_id_counter');
 
