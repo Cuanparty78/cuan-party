@@ -4402,125 +4402,37 @@ class ProfileViewPage extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              const Positioned.fill(child: _ProfileRoyalBackdrop()),
-              ListView(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
-            children: [
-              // Avatar + Frame
-              Center(
-                child: SizedBox(
-                  width: 132,
-                  height: 132,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 51,
-                        backgroundColor: _C.gold2,
-                        backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                        child: photoUrl.isEmpty
-                            ? const Icon(Icons.person, color: _C.brown, size: 52)
-                            : null,
-                      ),
-                      if (frameUrl.isNotEmpty)
-                        IgnorePointer(
-                          child: Image.network(
-                            frameUrl,
-                            width: 132,
-                            height: 132,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-
-              Center(
-                child: Text(
-                  name.isEmpty ? 'User' : name,
-                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
-                ),
-              ),
-              const SizedBox(height: 5),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (gender.isNotEmpty)
-                    Text(gender, style: const TextStyle(color: Color(0xFFF6E5C5), fontSize: 12, fontWeight: FontWeight.w600)),
-                  if (gender.isNotEmpty && country.isNotEmpty)
-                    const Text('  •  ', style: TextStyle(color: _C.gold2, fontSize: 12)),
-                  if (country.isNotEmpty)
-                    Text(country, style: const TextStyle(color: Color(0xFFF6E5C5), fontSize: 12, fontWeight: FontWeight.w600)),
-                ],
-              ),
-              const SizedBox(height: 7),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    cuanId.isEmpty ? 'CUAN ID' : 'ID: $cuanId',
-                    style: const TextStyle(color: Color(0xFFF6E5C5), fontWeight: FontWeight.w700),
-                  ),
-                  if (cuanId.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: () async {
-                        await Clipboard.setData(ClipboardData(text: cuanId));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('CUAN ID berhasil disalin'), duration: Duration(seconds: 1)),
-                          );
-                        }
-                      },
-                      child: const Icon(Icons.copy_rounded, color: _C.gold2, size: 16),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              Row(
-                children: [
-                  Expanded(child: _ProfileLevelBar(icon: '🪙', title: 'WEALTH', level: wealthLevel)),
-                  const SizedBox(width: 6),
-                  Expanded(child: _ProfileLevelBar(icon: '💖', title: 'CHARM', level: charmLevel)),
-                  const SizedBox(width: 6),
-                  Expanded(child: _ProfileLevelBar(icon: '🎮', title: 'GAME', level: gameLevel)),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              _LuxuryCard(
-                child: Row(
+              const Positioned.fill(child: _LuxuryBackdrop()),
+              SafeArea(
+                bottom: false,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 34),
                   children: [
-                    Expanded(child: _ProfileInfoItem(value: '$followerCount', label: 'Pengikut')),
-                    Expanded(child: _ProfileInfoItem(value: '$followingCount', label: 'Mengikuti')),
-                    Expanded(child: _ProfileInfoItem(value: '$visitorCount', label: 'Visitors')),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              _ProfileSectionTitle(title: 'BADGE'),
-              const SizedBox(height: 10),
-              _BadgeGrid(badges: badges),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _showAllBadges(context, badges),
-                  icon: const Icon(Icons.chevron_right_rounded, color: _C.gold2),
-                  label: const Text('Lihat semua', style: TextStyle(color: _C.gold2, fontWeight: FontWeight.w800)),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              _ProfileBottomTabs(userId: userId),
+                    _ProfileViewHero(
+                      name: name, cuanId: cuanId, photoUrl: photoUrl, frameUrl: frameUrl,
+                      gender: gender, country: country,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(child: _ProfileLevelBar(icon: '🪙', title: 'WEALTH', level: wealthLevel)),
+                      const SizedBox(width: 5),
+                      Expanded(child: _ProfileLevelBar(icon: '💖', title: 'CHARM', level: charmLevel)),
+                      const SizedBox(width: 5),
+                      Expanded(child: _ProfileLevelBar(icon: '🎮', title: 'GAME', level: gameLevel)),
+                    ]),
+                    const SizedBox(height: 12),
+                    _ProfileStatsPanel(
+                      followerCount: followerCount,
+                      followingCount: followingCount,
+                      visitorCount: visitorCount,
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileBadgePanel(
+                      badges: badges,
+                      onSeeAll: () => _showAllBadges(context, badges),
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileBottomTabs(userId: userId),
 
               if (FirebaseAuth.instance.currentUser?.uid != userId) ...[
                 const SizedBox(height: 20),
@@ -4583,6 +4495,7 @@ class ProfileViewPage extends StatelessWidget {
               ],
               ],
             ),
+              ),
           ],
         );
         },
@@ -4616,51 +4529,204 @@ class ProfileViewPage extends StatelessWidget {
   }
 }
 
+
+class _ProfileViewHero extends StatelessWidget {
+  final String name, cuanId, photoUrl, frameUrl, gender, country;
+  const _ProfileViewHero({
+    required this.name, required this.cuanId, required this.photoUrl,
+    required this.frameUrl, required this.gender, required this.country,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 292,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0, right: 0, top: 94, height: 178,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 48, 16, 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                  colors: [Color(0xD6784318), Color(0xD14B260E), Color(0xB86C3B16)],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(92), topRight: Radius.circular(92),
+                  bottomLeft: Radius.circular(42), bottomRight: Radius.circular(42),
+                ),
+                border: Border.all(color: const Color(0xFFE8B94E), width: 1.1),
+                boxShadow: const [BoxShadow(color: Color(0x55451F0B), blurRadius: 16, offset: Offset(0, 7))],
+              ),
+              child: Column(children: [
+                Text(name.isEmpty ? 'User' : name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0x665A2D0D), borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFD9A83D)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (gender.isNotEmpty) Text(gender, style: const TextStyle(color: Color(0xFFFFF4DA), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                    if (gender.isNotEmpty && country.isNotEmpty)
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 7), child: Text('|', style: TextStyle(color: Color(0xFFFFD77C)))),
+                    if (country.isNotEmpty) Text(country, style: const TextStyle(color: Color(0xFFFFF4DA), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+                const SizedBox(height: 6),
+                if (cuanId.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0x665A2D0D), borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFD9A83D)),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text('ID : $cuanId', style: const TextStyle(color: Color(0xFFFFF4DA), fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.copy_rounded, color: Color(0xFFFFD77C), size: 14),
+                    ]),
+                  ),
+              ]),
+            ),
+          ),
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Center(
+              child: SizedBox(
+                width: 128, height: 128,
+                child: Stack(alignment: Alignment.center, children: [
+                  CircleAvatar(
+                    radius: 47, backgroundColor: const Color(0xFF9F42C5),
+                    backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                    child: photoUrl.isEmpty ? const Text('A', style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w300)) : null,
+                  ),
+                  if (frameUrl.isNotEmpty)
+                    IgnorePointer(child: Image.network(frameUrl, width: 128, height: 128, fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                ]),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileStatsPanel extends StatelessWidget {
+  final int followerCount, followingCount, visitorCount;
+  const _ProfileStatsPanel({required this.followerCount, required this.followingCount, required this.visitorCount});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 88,
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 9),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(colors: [Color(0xFFFDF7E9), Color(0xFFFFFDF6), Color(0xFFF7EACB)]),
+      borderRadius: BorderRadius.circular(27),
+      border: Border.all(color: const Color(0xFFD7A33A), width: 1.5),
+      boxShadow: const [BoxShadow(color: Color(0x445B3517), blurRadius: 11, offset: Offset(0, 5))],
+    ),
+    child: Row(children: [
+      Expanded(child: _ProfileInfoItem(value: '$followerCount', label: 'Pengikut')),
+      Container(width: 1, height: 44, color: const Color(0xFFD7A33A)),
+      Expanded(child: _ProfileInfoItem(value: '$followingCount', label: 'Mengikuti')),
+      Container(width: 1, height: 44, color: const Color(0xFFD7A33A)),
+      Expanded(child: _ProfileInfoItem(value: '$visitorCount', label: 'VISITORS')),
+    ]),
+  );
+}
+
+class _ProfileBadgePanel extends StatelessWidget {
+  final List<String> badges;
+  final VoidCallback onSeeAll;
+  const _ProfileBadgePanel({required this.badges, required this.onSeeAll});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(9, 8, 9, 5),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [Color(0xF9FFF8E9), Color(0xF6F4E1C5)]),
+      borderRadius: BorderRadius.circular(23),
+      border: Border.all(color: const Color(0xFFD7A33A), width: 1.4),
+      boxShadow: const [BoxShadow(color: Color(0x445B3517), blurRadius: 11, offset: Offset(0, 5))],
+    ),
+    child: Column(children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 27, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF8E5716), Color(0xFFD9A83D), Color(0xFF8E5716)]),
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: const Color(0xFFFFD878)),
+        ),
+        child: const Text('BADGE', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 1)),
+      ),
+      const SizedBox(height: 7),
+      _BadgeGrid(badges: badges),
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: onSeeAll,
+          icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF9A641B), size: 19),
+          label: const Text('Lihat semua', style: TextStyle(color: Color(0xFF9A641B), fontWeight: FontWeight.w900)),
+        ),
+      ),
+    ]),
+  );
+}
+
 class _ProfileSectionTitle extends StatelessWidget {
   final String title;
   const _ProfileSectionTitle({required this.title});
   @override
-  Widget build(BuildContext context) => Text(title, style: const TextStyle(color: _C.gold2, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.2));
+  Widget build(BuildContext context) => Text(title, style: const TextStyle(color: Color(0xFF8B5A13), fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.1));
 }
 
 class _BadgeGrid extends StatelessWidget {
   final List<String> badges;
   const _BadgeGrid({required this.badges});
   @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 10,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 8, mainAxisSpacing: 10, childAspectRatio: .88),
-      itemBuilder: (_, i) => _BadgeTile(label: i < badges.length ? badges[i] : '', size: 48),
-    );
-  }
+  Widget build(BuildContext context) => GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: 10,
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 5, crossAxisSpacing: 5, mainAxisSpacing: 7, childAspectRatio: 1,
+    ),
+    itemBuilder: (_, i) => _BadgeTile(label: i < badges.length ? badges[i] : '', size: 48),
+  );
 }
 
 class _BadgeTile extends StatelessWidget {
   final String label;
   final double size;
   const _BadgeTile({required this.label, required this.size});
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: label.isEmpty ? const Color(0xFF2A211A) : const Color(0xFF3A2B1B),
-            border: Border.all(color: label.isEmpty ? const Color(0xFF5A4732) : _C.gold2, width: 1.3),
-            boxShadow: label.isEmpty ? null : [BoxShadow(color: _C.gold.withOpacity(.18), blurRadius: 10)],
-          ),
-          child: label.isEmpty
-              ? const Icon(Icons.workspace_premium_outlined, color: Color(0xFF6D5A43), size: 22)
-              : Center(child: Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.gold2, fontSize: 9, fontWeight: FontWeight.w900))),
-        ),
-      ],
+    final isUrl = label.startsWith('http://') || label.startsWith('https://');
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFFFF8E7),
+        border: Border.all(color: const Color(0xFFD7A33A), width: 1.1),
+        boxShadow: const [BoxShadow(color: Color(0x33452A0E), blurRadius: 7, offset: Offset(0, 3))],
+      ),
+      child: isUrl
+          ? ClipOval(child: Image.network(label, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.workspace_premium_rounded, color: Color(0xFF9A641B), size: 28)))
+          : Icon(
+              label.isEmpty ? Icons.workspace_premium_outlined : Icons.workspace_premium_rounded,
+              color: label.isEmpty ? const Color(0xFF8C7046) : const Color(0xFFB47719),
+              size: size * .46,
+            ),
     );
   }
 }
@@ -4729,111 +4795,60 @@ class _ProfileLevelBar extends StatelessWidget {
   final String icon;
   final String title;
   final int level;
-
-  const _ProfileLevelBar({
-    required this.icon,
-    required this.title,
-    required this.level,
-  });
+  const _ProfileLevelBar({required this.icon, required this.title, required this.level});
 
   IconData _iconForTitle() {
     switch (title) {
-      case 'WEALTH':
-        return Icons.workspace_premium_rounded;
-      case 'CHARM':
-        return Icons.favorite_rounded;
-      default:
-        return Icons.sports_esports_rounded;
+      case 'WEALTH': return Icons.workspace_premium_rounded;
+      case 'CHARM': return Icons.favorite_rounded;
+      default: return Icons.sports_esports_rounded;
+    }
+  }
+
+  Color _accent() {
+    switch (title) {
+      case 'CHARM': return const Color(0xFFE91E8C);
+      case 'GAME': return const Color(0xFF263238);
+      default: return const Color(0xFFD39A22);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final tier = _getLevelTierColor(level);
+    final accent = _accent();
     return Container(
-      height: 70,
+      height: 44,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFFCF2),
-            Color(0xFFFFE9B6),
-            Color(0xFFFFFBF1),
-          ],
+        gradient: const LinearGradient(colors: [Color(0xFFFFFDF7), Color(0xFFFFE9B5), Color(0xFFFFFCF4)]),
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(color: const Color(0xFFD7A33A), width: 1.05),
+        boxShadow: const [BoxShadow(color: Color(0x338B5A13), blurRadius: 7, offset: Offset(0, 3))],
+      ),
+      child: Row(children: [
+        const SizedBox(width: 2),
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [accent, const Color(0xFF8A5A18)]),
+            border: Border.all(color: const Color(0xFFFFE8A5), width: 1.1),
+          ),
+          child: Icon(_iconForTitle(), color: Colors.white, size: 21),
         ),
-        borderRadius: BorderRadius.circular(35),
-        border: Border.all(color: const Color(0xFFD5A63A), width: 1.7),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF8B5A13).withOpacity(.25),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+        const SizedBox(width: 5),
+        Expanded(
+          child: FittedBox(
+            fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('LV $level', style: const TextStyle(color: Color(0xFF8B5A13), fontSize: 14, fontWeight: FontWeight.w900, height: 1)),
+              const SizedBox(height: 2),
+              Text(title, style: const TextStyle(color: Color(0xFF70450E), fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: .15, height: 1)),
+            ]),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 7),
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [tier, const Color(0xFF6E4617)],
-              ),
-              border: Border.all(color: const Color(0xFFFFE39A), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: tier.withOpacity(.30),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-            child: Icon(
-              _iconForTitle(),
-              color: const Color(0xFFFFF4D2),
-              size: 29,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'LV $level',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF8B5A13),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF7B4D13),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: .35,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 3),
+      ]),
     );
   }
 }
