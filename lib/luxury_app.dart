@@ -4337,198 +4337,408 @@ class AppProfileState {
   static final ValueNotifier<DateTime?> vipExpiresAt = ValueNotifier<DateTime?>(null);
   static final ValueNotifier<String?> vipCheckinClaimedDate = ValueNotifier<String?>(null);
 }
-class ProfileViewPage extends StatelessWidget {
-  final String userId;
+class ProfileViewPage extends StatefulWidget {
+  const ProfileViewPage({Key? key}) : super(key: key);
 
-  const ProfileViewPage({
-    super.key,
-    required this.userId,
-  });
+  @override
+  State<ProfileViewPage> createState() => _ProfileViewPageState();
+}
+
+class _ProfileViewPageState extends State<ProfileViewPage> {
+  int _selectedTabIndex = 0; // 0: Relationship, 1: Frame, 2: Gift
+
+  // Definisi warna gradien emas premium
+  final Gradient goldGradient = const LinearGradient(
+    colors: [Color(0xFFFFDF73), Color(0xFFC69C38), Color(0xFFFFDF73)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _C.bg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         title: const Text(
           'Profile',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_square, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
       ),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final data = snapshot.data?.data();
-          if (data == null) {
-            return const Center(
-              child: Text('Profil tidak ditemukan', style: TextStyle(color: Colors.white)),
-            );
-          }
-
-          final name = '${data['displayName'] ?? 'User'}'.trim();
-          final cuanId = '${data['cuanId'] ?? ''}'.trim();
-          final photoUrl = '${data['photoUrl'] ?? ''}'.trim();
-          final frameUrl = '${data['frameUrl'] ?? ''}'.trim();
-          final gender = '${data['gender'] ?? ''}'.trim();
-          final country = '${data['country'] ?? ''}'.trim();
-
-          int level(dynamic value) => value is num ? value.toInt().clamp(1, 120) : 1;
-          final wealthLevel = level(data['wealthLevel']);
-          final charmLevel = level(data['charmLevel']);
-          final gameLevel = level(data['gameLevel']);
-
-          final rawBadges = data['badges'];
-          final badges = rawBadges is List
-              ? rawBadges.map((e) => '$e').where((e) => e.trim().isNotEmpty).take(10).toList()
-              : <String>[];
-
-          final followerCount = data['followersCount'] is num
-              ? (data['followersCount'] as num).toInt()
-              : 0;
-          final followingCount = data['followingCount'] is num
-              ? (data['followingCount'] as num).toInt()
-              : 0;
-          final visitorCount = data['visitorsCount'] is num
-              ? (data['visitorsCount'] as num).toInt()
-              : 0;
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              const Positioned.fill(child: _LuxuryBackdrop()),
-              SafeArea(
-                bottom: false,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 34),
-                  children: [
-                    _ProfileViewHero(
-                      name: name, cuanId: cuanId, photoUrl: photoUrl, frameUrl: frameUrl,
-                      gender: gender, country: country,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(children: [
-                      Expanded(child: _ProfileLevelBar(icon: '🪙', title: 'WEALTH', level: wealthLevel)),
-                      const SizedBox(width: 5),
-                      Expanded(child: _ProfileLevelBar(icon: '💖', title: 'CHARM', level: charmLevel)),
-                      const SizedBox(width: 5),
-                      Expanded(child: _ProfileLevelBar(icon: '🎮', title: 'GAME', level: gameLevel)),
-                    ]),
-                    const SizedBox(height: 12),
-                    _ProfileStatsPanel(
-                      followerCount: followerCount,
-                      followingCount: followingCount,
-                      visitorCount: visitorCount,
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileBadgePanel(
-                      badges: badges,
-                      onSeeAll: () => _showAllBadges(context, badges),
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileBottomTabs(userId: userId),
-
-              if (FirebaseAuth.instance.currentUser?.uid != userId) ...[
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance.collection('users').doc(userId).collection('followers').doc(FirebaseAuth.instance.currentUser?.uid).snapshots(),
-                        builder: (context, followSnapshot) {
-                          final isFollowing = followSnapshot.data?.exists ?? false;
-                          return ElevatedButton.icon(
-                            onPressed: () async {
-                              final currentUser = FirebaseAuth.instance.currentUser;
-                              if (currentUser == null) return;
-                              final myUid = currentUser.uid;
-                              final followingRef = FirebaseFirestore.instance.collection('users').doc(myUid).collection('following').doc(userId);
-                              final followerRef = FirebaseFirestore.instance.collection('users').doc(userId).collection('followers').doc(myUid);
-                              try {
-                                final batch = FirebaseFirestore.instance.batch();
-                                if (isFollowing) {
-                                  batch.delete(followingRef);
-                                  batch.delete(followerRef);
-                                } else {
-                                  batch.set(followingRef, {'userId': userId, 'createdAt': FieldValue.serverTimestamp()});
-                                  batch.set(followerRef, {'userId': myUid, 'createdAt': FieldValue.serverTimestamp()});
-                                }
-                                await batch.commit();
-                              } catch (e) {
-                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengubah Follow: $e')));
-                              }
-                            },
-                            icon: Icon(isFollowing ? Icons.person_remove_alt_1 : Icons.person_add_alt_1),
-                            label: Text(isFollowing ? 'Following' : 'Follow'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isFollowing ? _C.brown2 : _C.gold,
-                              foregroundColor: isFollowing ? Colors.white : _C.brown,
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chat segera tersedia'))),
-                        icon: const Icon(Icons.chat_bubble_outline),
-                        label: const Text('Message'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _C.gold2,
-                          side: const BorderSide(color: _C.gold2),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFE8D3A2), Color(0xFFFAF1D6), Color(0xFFD4AF37)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: [
+                _buildHeaderSection(),
+                const SizedBox(height: 16),
+                _buildLevelBadges(),
+                const SizedBox(height: 16),
+                _buildStatsBox(),
+                const SizedBox(height: 16),
+                _buildBadgesGrid(),
+                const SizedBox(height: 16),
+                _buildBottomTabSection(),
+                const SizedBox(height: 32),
               ],
             ),
-              ),
-          ],
-        );
-        },
-      ),
-    );
-  }
-
-  static void _showAllBadges(BuildContext context, List<String> badges) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _C.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('My Badge Collection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 14),
-              if (badges.isEmpty)
-                const Text('Belum ada badge.', style: TextStyle(color: _C.muted))
-              else
-                Wrap(spacing: 10, runSpacing: 10, children: badges.map((b) => _BadgeTile(label: b, size: 58)).toList()),
-            ],
           ),
         ),
       ),
     );
   }
-}
 
+  Widget _buildHeaderSection() {
+    return Column(
+      children: [
+        const SizedBox(height: 10),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFC69C38), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  )
+                ],
+              ),
+              child: const CircleAvatar(
+                backgroundColor: Color(0xFF8A2BE2),
+                child: Text(
+                  'A',
+                  style: TextStyle(
+                    fontSize: 50,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: -10,
+              child: Icon(Icons.stars, size: 36, color: Colors.amber[600]),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'JPARTY',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildInfoChip(Icons.male, 'Laki-laki'),
+            const SizedBox(width: 8),
+            _buildInfoChip(Icons.flag, 'Indonesia'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('ID : 1001001', style: TextStyle(color: Colors.white)),
+              SizedBox(width: 8),
+              Icon(Icons.copy, color: Colors.white, size: 14),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLevelBadges() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildLevelItem('LV 1', 'WEALTH', Icons.diamond),
+        _buildLevelItem('LV 1', 'CHARM', Icons.favorite),
+        _buildLevelItem('LV 1', 'GAME', Icons.sports_esports),
+      ],
+    );
+  }
+
+  Widget _buildLevelItem(String level, String label, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF9E6), Color(0xFFFFE0B2)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFC69C38), width: 1.5),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+      ),
+      child: Row(
+        children: [
+          Container(
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFC69C38)),
+            padding: const EdgeInsets.all(4),
+            child: Icon(icon, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(level, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF5D4037))),
+              Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF5D4037))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsBox() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF5E6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFC69C38), width: 2),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildStatItem('0', 'Pengikut', Icons.people),
+          _buildStatItem('0', 'Mengikuti', Icons.person_add),
+          _buildStatItem('0', 'VISITORS', Icons.remove_red_eye),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String count, String label, IconData icon) {
+    return Column(
+      children: [
+        Text(
+          count,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF3E2723)),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(icon, size: 12, color: const Color(0xFF5D4037)),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBadgesGrid() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF5E6).withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFC69C38), width: 2),
+      ),
+      child: Column(
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.star, size: 12, color: Color(0xFFC69C38)),
+              SizedBox(width: 8),
+              Text(
+                'BADGE',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF3E2723), letterSpacing: 1.5),
+              ),
+              SizedBox(width: 8),
+              Icon(Icons.star, size: 12, color: Color(0xFFC69C38)),
+            ],
+          ),
+          const Divider(color: Color(0xFFC69C38)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: List.generate(10, (index) {
+              return Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.amber[100],
+                  border: Border.all(color: const Color(0xFFC69C38), width: 2),
+                ),
+                child: const Icon(Icons.workspace_premium, color: Color(0xFFC69C38)),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '> Lihat semua',
+              style: TextStyle(color: Colors.grey[700], fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomTabSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A1B0A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFC69C38), width: 1.5),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildTabHeader('RELATIONSHIP', 0),
+              _buildTabHeader('FRAME', 1),
+              _buildTabHeader('GIFT', 2),
+            ],
+          ),
+          const Divider(color: Color(0xFFC69C38), height: 1),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: _selectedTabIndex == 0
+                ? _buildRelationshipEmptyState()
+                : const Center(child: Text('Konten lainnya', style: TextStyle(color: Colors.white))),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabHeader(String title, int index) {
+    bool isSelected = _selectedTabIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTabIndex = index;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? const Color(0xFFFFDF73) : Colors.transparent,
+              width: 3,
+            ),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFFFFDF73) : Colors.grey,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRelationshipEmptyState() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.emoji_events, color: Colors.grey, size: 40),
+        const SizedBox(height: 8),
+        const Text(
+          'Belum ada relationship',
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: goldGradient,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_circle, color: Color(0xFF3E2723), size: 16),
+              SizedBox(width: 8),
+              Text(
+                'Tambah Relationship',
+                style: TextStyle(color: Color(0xFF3E2723), fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        )
+      ],
+    );
+  }
+}
 
 class _ProfileViewHero extends StatelessWidget {
   final String name, cuanId, photoUrl, frameUrl, gender, country;
