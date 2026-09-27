@@ -4399,8 +4399,12 @@ class ProfileViewPage extends StatelessWidget {
               ? (data['visitorsCount'] as num).toInt()
               : 0;
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              const Positioned.fill(child: _ProfileRoyalBackdrop()),
+              ListView(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
             children: [
               // Avatar + Frame
               Center(
@@ -4577,8 +4581,10 @@ class ProfileViewPage extends StatelessWidget {
                   ],
                 ),
               ],
-            ],
-          );
+              ],
+            ),
+          ],
+        );
         },
       ),
     );
@@ -4730,40 +4736,211 @@ class _ProfileLevelBar extends StatelessWidget {
     required this.level,
   });
 
+  IconData _iconForTitle() {
+    switch (title) {
+      case 'WEALTH':
+        return Icons.workspace_premium_rounded;
+      case 'CHARM':
+        return Icons.favorite_rounded;
+      default:
+        return Icons.sports_esports_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tier = _getLevelTierColor(level);
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 5,
-        vertical: 8,
-      ),
+      height: 70,
       decoration: BoxDecoration(
-        color: _getLevelTierColor(level),
-        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFFCF2),
+            Color(0xFFFFE9B6),
+            Color(0xFFFFFBF1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(35),
+        border: Border.all(color: const Color(0xFFD5A63A), width: 1.7),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5A13).withOpacity(.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Text(
-            '$icon LV $level',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
+          const SizedBox(width: 7),
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [tier, const Color(0xFF6E4617)],
+              ),
+              border: Border.all(color: const Color(0xFFFFE39A), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: tier.withOpacity(.30),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: Icon(
+              _iconForTitle(),
+              color: const Color(0xFFFFF4D2),
+              size: 29,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 8,
-              fontWeight: FontWeight.w700,
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'LV $level',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF8B5A13),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF7B4D13),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .35,
+                    height: 1,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _ProfileRoyalBackdrop extends StatelessWidget {
+  const _ProfileRoyalBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _ProfileRoyalBackdropPainter(),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _ProfileRoyalBackdropPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    final bg = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFFF9E7C0),
+          Color(0xFFFFF7E8),
+          Color(0xFFF4E0B8),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, bg);
+
+    // Soft palace glow in the center.
+    final glow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0, -.25),
+        radius: 1.0,
+        colors: [
+          const Color(0xFFFFFDF5).withOpacity(.95),
+          const Color(0xFFFFE5AA).withOpacity(.35),
+          Colors.transparent,
+        ],
+        stops: const [0, .52, 1],
+      ).createShader(rect);
+    canvas.drawRect(rect, glow);
+
+    final gold = Paint()
+      ..color = const Color(0xFFC58A27)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 4;
+
+    final lightGold = Paint()
+      ..color = const Color(0xFFFFD878).withOpacity(.72)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2;
+
+    // Symmetrical sweeping royal ribbons.
+    final left = Path()
+      ..moveTo(-size.width * .12, size.height * .08)
+      ..cubicTo(size.width * .22, size.height * .18, size.width * .20, size.height * .34, size.width * .03, size.height * .46)
+      ..cubicTo(size.width * .20, size.height * .57, size.width * .25, size.height * .76, -size.width * .08, size.height * .92);
+    final right = Path()
+      ..moveTo(size.width * 1.12, size.height * .08)
+      ..cubicTo(size.width * .78, size.height * .18, size.width * .80, size.height * .34, size.width * .97, size.height * .46)
+      ..cubicTo(size.width * .80, size.height * .57, size.width * .75, size.height * .76, size.width * 1.08, size.height * .92);
+
+    canvas.drawPath(left, gold);
+    canvas.drawPath(right, gold);
+    canvas.drawPath(left.shift(const Offset(12, 0)), lightGold);
+    canvas.drawPath(right.shift(const Offset(-12, 0)), lightGold);
+
+    // Top cathedral-like arch.
+    final arch = Path()
+      ..moveTo(size.width * .08, size.height * .18)
+      ..quadraticBezierTo(size.width * .5, -size.height * .08, size.width * .92, size.height * .18);
+    canvas.drawPath(arch, lightGold);
+
+    // Bottom jeweled flourish.
+    final diamond = Path()
+      ..moveTo(size.width * .5, size.height * .93)
+      ..lineTo(size.width * .5 + 13, size.height * .93 + 13)
+      ..lineTo(size.width * .5, size.height * .93 + 26)
+      ..lineTo(size.width * .5 - 13, size.height * .93 + 13)
+      ..close();
+    final dp = Paint()..color = const Color(0xFF7E3E9C);
+    canvas.drawPath(diamond, dp);
+    canvas.drawPath(diamond, gold);
+
+    // Tiny royal sparkles.
+    final sparkle = Paint()..color = const Color(0xFFD9A83B);
+    for (final p in [
+      Offset(size.width * .08, size.height * .28),
+      Offset(size.width * .92, size.height * .28),
+      Offset(size.width * .14, size.height * .63),
+      Offset(size.width * .86, size.height * .63),
+    ]) {
+      canvas.drawCircle(p, 2.5, sparkle);
+      canvas.drawLine(Offset(p.dx - 7, p.dy), Offset(p.dx + 7, p.dy), sparkle);
+      canvas.drawLine(Offset(p.dx, p.dy - 7), Offset(p.dx, p.dy + 7), sparkle);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _ProfileInfoItem extends StatelessWidget {
