@@ -125,7 +125,23 @@ class _C {
   static const muted = Color(0xFF8D7A68);
 }
 
+enum _LevelTier {
+  tier1,
+  tier2,
+  tier3,
+  tier4,
+  tier5,
+  tier6,
+}
 
+_LevelTier _getLevelTier(int level) {
+  if (level <= 20) return _LevelTier.tier1;
+  if (level <= 40) return _LevelTier.tier2;
+  if (level <= 60) return _LevelTier.tier3;
+  if (level <= 80) return _LevelTier.tier4;
+  if (level <= 100) return _LevelTier.tier5;
+  return _LevelTier.tier6;
+}
 final ImageProvider _cuanPalaceBackground =
     MemoryImage(base64Decode(_cuanPalaceBgBase64));
 
