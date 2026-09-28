@@ -4467,7 +4467,12 @@ const String _profileBgBase64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHCAkIBgoJCAk
 class _ProfileGlowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..shader = RadialGradient(center: const Alignment(0, -.15), radius: 1.1, colors: [Colors.white.withOpacity(.26), Colors.transparent]);
+    final p = Paint()
+      ..shader = const RadialGradient(
+        center: Alignment(0, -.15),
+        radius: 1.1,
+        colors: [Color(0x42FFFFFF), Color(0x00FFFFFF)],
+      ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, p);
     final sparkle = Paint()..color = const Color(0xFFFFD66B).withOpacity(.62);
     for (final x in [.08, .18, .82, .92]) {
@@ -4482,6 +4487,70 @@ class _ProfileGlowPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+
+
+class _HeroPanelPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      const Radius.circular(92),
+    );
+
+    final fill = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xCC6B3A0D),
+          Color(0xD98B4E12),
+          Color(0xE05B2E08),
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawRRect(rect, fill);
+
+    final border = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..color = const Color(0xFFE8C15C);
+    canvas.drawRRect(rect.deflate(1), border);
+
+    final inner = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8
+      ..color = const Color(0x66FFE7A0);
+    canvas.drawRRect(rect.deflate(8), inner);
+
+    // Subtle central glow so the panel feels like the reference artwork.
+    final glow = Paint()
+      ..shader = const RadialGradient(
+        center: Alignment(0, -.25),
+        radius: .95,
+        colors: [Color(0x22FFE9A8), Color(0x00FFE9A8)],
+      ).createShader(Offset.zero & size);
+    canvas.drawRRect(rect, glow);
+
+    // Small diamond ornament at the bottom center.
+    final cx = size.width / 2;
+    final cy = size.height - 2;
+    final diamond = Path()
+      ..moveTo(cx, cy - 12)
+      ..lineTo(cx + 12, cy)
+      ..lineTo(cx, cy + 12)
+      ..lineTo(cx - 12, cy)
+      ..close();
+    canvas.drawPath(
+      diamond,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFFFFF1A8), Color(0xFFD49320), Color(0xFFFFE78A)],
+        ).createShader(Rect.fromLTWH(cx - 12, cy - 12, 24, 24)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeroPanelPainter oldDelegate) => false;
+}
 
 class _ProfileViewHero extends StatelessWidget {
   final String name, cuanId, photoUrl, frameUrl, gender, country;
@@ -4892,7 +4961,7 @@ class _ProfileLevelBar extends StatelessWidget {
           child: SizedBox(
             width: 56, height: 56,
             child: CustomPaint(
-              painter: _LevelMedallionPainter(accent: accent),
+              painter: _LevelMedallionPainter(accent: accent, kind: title),
               child: Center(child: Icon(emblem, color: Colors.white, size: 25)),
             ),
           ),
