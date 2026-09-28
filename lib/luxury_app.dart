@@ -4387,6 +4387,36 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
             return const Center(child: CircularProgressIndicator(color: _gold));
           }
 
+          if (snapshot.hasError) {
+            return Container(
+              color: const Color(0xFFFFF7E5),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: _brown, size: 48),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Profile gagal dimuat',
+                    style: TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: _brown, fontSize: 12),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('Coba lagi'),
+                  ),
+                ],
+              ),
+            );
+          }
+
           final data = snapshot.data?.data() ?? <String, dynamic>{};
           final name = '${data['displayName'] ?? 'User'}'.trim();
           final id = '${data['cuanId'] ?? widget.userId}'.trim();
