@@ -4337,46 +4337,64 @@ class AppProfileState {
   static final ValueNotifier<DateTime?> vipExpiresAt = ValueNotifier<DateTime?>(null);
   static final ValueNotifier<String?> vipCheckinClaimedDate = ValueNotifier<String?>(null);
 }
-class ProfileViewPage extends StatelessWidget {
+class ProfileViewPage extends StatefulWidget {
   final String userId;
   const ProfileViewPage({super.key, required this.userId});
 
   @override
+  State<ProfileViewPage> createState() => _ProfileViewPageState();
+}
+
+class _ProfileViewPageState extends State<ProfileViewPage> {
+  int _selectedTabIndex = 0;
+
+  static const Color gold = Color(0xFFD4A63A);
+  static const Color brightGold = Color(0xFFFFDF73);
+  static const Color cream = Color(0xFFFFF8E8);
+  static const Color brown = Color(0xFF4A280D);
+  static const Color deepBrown = Color(0xFF2B1607);
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4E3C2),
+      backgroundColor: const Color(0xFFF1DEB7),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: false,
-        title: const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-        iconTheme: const IconThemeData(color: Colors.white, size: 30),
+        centerTitle: true,
+        title: const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        actions: [IconButton(icon: const Icon(Icons.edit_rounded, color: Colors.white), onPressed: () {})],
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+        stream: FirebaseFirestore.instance.collection('users').doc(widget.userId).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFFD5A63B)));
+            return const Center(child: CircularProgressIndicator(color: gold));
           }
           final data = snapshot.data?.data();
           if (data == null) {
-            return const Center(child: Text('Profil tidak ditemukan', style: TextStyle(color: Color(0xFF6C4A20))));
+            return const Center(child: Text('Profil tidak ditemukan', style: TextStyle(color: brown)));
           }
 
-          final name = '${data['displayName'] ?? 'User'}'.trim();
-          final cuanId = '${data['cuanId'] ?? ''}'.trim();
-          final photoUrl = '${data['photoUrl'] ?? ''}'.trim();
-          final frameUrl = '${data['frameUrl'] ?? ''}'.trim();
-          final gender = '${data['gender'] ?? ''}'.trim();
-          final country = '${data['country'] ?? ''}'.trim();
-          int lvl(dynamic v) => v is num ? v.toInt().clamp(1, 120) : 1;
-          final wealth = lvl(data['wealthLevel']);
-          final charm = lvl(data['charmLevel']);
-          final game = lvl(data['gameLevel']);
-          final rawBadges = data['badges'];
-          final badges = rawBadges is List ? rawBadges.map((e) => '$e').where((e) => e.trim().isNotEmpty).take(10).toList() : <String>[];
+          int level(dynamic value) => value is num ? value.toInt().clamp(1, 120) : 1;
           int count(String key) => data[key] is num ? (data[key] as num).toInt() : 0;
+          String str(String key, [String fallback = '']) => '${data[key] ?? fallback}'.trim();
+
+          final name = str('displayName', 'User');
+          final id = str('cuanId');
+          final photo = str('photoUrl');
+          final frame = str('frameUrl');
+          final gender = str('gender');
+          final country = str('country', 'Indonesia');
+          final wealth = level(data['wealthLevel']);
+          final charm = level(data['charmLevel']);
+          final game = level(data['gameLevel']);
+          final rawBadges = data['badges'];
+          final badges = rawBadges is List
+              ? rawBadges.map((e) => '$e').where((e) => e.trim().isNotEmpty).take(10).toList()
+              : <String>[];
 
           return Stack(
             fit: StackFit.expand,
@@ -4384,35 +4402,22 @@ class ProfileViewPage extends StatelessWidget {
               const Positioned.fill(child: _ProfileViewBackdrop()),
               SafeArea(
                 bottom: false,
-                child: ListView(
+                child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(18, 72, 18, 34),
-                  children: [
-                    _ProfileViewHero(
-                      name: name, cuanId: cuanId, photoUrl: photoUrl, frameUrl: frameUrl,
-                      gender: gender, country: country,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Expanded(child: _ProfileLevelBar(icon: 'WEALTH', title: 'WEALTH', level: wealth)),
-                        const SizedBox(width: 7),
-                        Expanded(child: _ProfileLevelBar(icon: 'CHARM', title: 'CHARM', level: charm)),
-                        const SizedBox(width: 7),
-                        Expanded(child: _ProfileLevelBar(icon: 'GAME', title: 'GAME', level: game)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileStatsPanel(followerCount: count('followersCount'), followingCount: count('followingCount'), visitorCount: count('visitorsCount')),
-                    const SizedBox(height: 13),
-                    _ProfileBadgePanel(badges: badges, onSeeAll: () => _showAllBadges(context, badges)),
-                    const SizedBox(height: 12),
-                    _ProfileBottomTabs(userId: userId),
-                    if (FirebaseAuth.instance.currentUser?.uid != userId) ...[
-                      const SizedBox(height: 18),
-                      _ProfileActionRow(userId: userId),
+                  padding: const EdgeInsets.fromLTRB(14, 68, 14, 32),
+                  child: Column(
+                    children: [
+                      _buildHeader(name, id, photo, frame, gender, country),
+                      const SizedBox(height: 10),
+                      _buildLevels(wealth, charm, game),
+                      const SizedBox(height: 12),
+                      _buildStats(count('followersCount'), count('followingCount'), count('visitorsCount')),
+                      const SizedBox(height: 12),
+                      _buildBadges(badges),
+                      const SizedBox(height: 12),
+                      _buildTabs(),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -4422,29 +4427,341 @@ class ProfileViewPage extends StatelessWidget {
     );
   }
 
-  static void _showAllBadges(BuildContext context, List<String> badges) {
+  Widget _buildHeader(String name, String id, String photo, String frame, String gender, String country) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 194,
+          child: Stack(
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                top: 70,
+                left: 16,
+                right: 16,
+                child: CustomPaint(
+                  painter: _PVHeroPanelPainter(),
+                  child: const SizedBox(height: 116),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                child: SizedBox(
+                  width: 132,
+                  height: 132,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 118,
+                        height: 118,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF7A32B7),
+                          border: Border.all(color: brightGold, width: 4),
+                          boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 14, offset: Offset(0, 6))],
+                          image: photo.isNotEmpty ? DecorationImage(image: NetworkImage(photo), fit: BoxFit.cover) : null,
+                        ),
+                        child: photo.isEmpty ? const Text('A', style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900)) : null,
+                      ),
+                      if (frame.isNotEmpty)
+                        Positioned.fill(child: Image.network(frame, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                      Positioned(top: -6, child: _PVMiniCrown()),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 80,
+                left: 0,
+                right: 0,
+                child: Column(
+                  children: [
+                    Text(name, style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 5)])),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _PVInfoChip(icon: gender.toLowerCase().contains('perempuan') ? Icons.female_rounded : Icons.male_rounded, text: gender.isEmpty ? 'Laki-laki' : gender),
+                        _PVInfoChip(icon: Icons.flag_rounded, text: country),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0x66371908), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0x88FFE19A))),
+                      child: Text('ID : ${id.isEmpty ? '-' : id}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLevels(int wealth, int charm, int game) {
+    return Row(
+      children: [
+        Expanded(child: _PVLevelCard(level: wealth, label: 'WEALTH', kind: _PVLevelKind.wealth)),
+        const SizedBox(width: 7),
+        Expanded(child: _PVLevelCard(level: charm, label: 'CHARM', kind: _PVLevelKind.charm)),
+        const SizedBox(width: 7),
+        Expanded(child: _PVLevelCard(level: game, label: 'GAME', kind: _PVLevelKind.game)),
+      ],
+    );
+  }
+
+  Widget _buildStats(int followers, int following, int visitors) {
+    return Container(
+      height: 68,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9EBCB),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: gold, width: 1.8),
+        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 8, offset: Offset(0, 3))],
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _PVStat(followers.toString(), 'Pengikut')),
+          _PVDivider(),
+          Expanded(child: _PVStat(following.toString(), 'Mengikuti')),
+          _PVDivider(),
+          Expanded(child: _PVStat(visitors.toString(), 'Visitors')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadges(List<String> badges) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8EAC9),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: gold, width: 1.8),
+        boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 8, offset: Offset(0, 3))],
+      ),
+      child: Column(
+        children: [
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.diamond_rounded, color: gold, size: 13),
+            const SizedBox(width: 7),
+            const Text('BADGE', style: TextStyle(color: brown, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
+            const SizedBox(width: 7),
+            const Icon(Icons.diamond_rounded, color: gold, size: 13),
+          ]),
+          const SizedBox(height: 9),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 10,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1),
+            itemBuilder: (_, i) => _PVBadgeTile(url: i < badges.length ? badges[i] : ''),
+          ),
+          const SizedBox(height: 7),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () => _showAllBadges(context, badges),
+              child: const Text('> Lihat semua', style: TextStyle(color: Color(0xFF70430E), fontSize: 11.5, fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabs() {
+    return Container(
+      decoration: BoxDecoration(
+        color: deepBrown.withOpacity(.96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: gold, width: 1.5),
+        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          Row(children: [
+            _PVTab('RELATIONSHIPS', 0),
+            _PVTab('FRAME', 1),
+            _PVTab('GIFT', 2),
+          ]),
+          Container(height: 1, color: const Color(0x66D4A63A)),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: _selectedTabIndex == 0
+                ? _buildRelationshipContent()
+                : Center(key: ValueKey(_selectedTabIndex), child: const Padding(padding: EdgeInsets.all(38), child: Text('Belum ada data', style: TextStyle(color: Color(0xFFC9B99E), fontSize: 12)))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRelationshipContent() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 26, 18, 28),
+      child: Column(
+        children: [
+          const Icon(Icons.favorite_border_rounded, color: Color(0xFFB9A17E), size: 38),
+          const SizedBox(height: 8),
+          const Text('Belum ada relationship', style: TextStyle(color: Color(0xFFB9A17E), fontSize: 12)),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [brightGold, gold]), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x553A2208), blurRadius: 7, offset: Offset(0, 3))]),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: brown, size: 17), SizedBox(width: 6), Text('Tambah Relationship', style: TextStyle(color: brown, fontWeight: FontWeight.w900, fontSize: 12))]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _PVTab(String title, int index) {
+    final selected = _selectedTabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTabIndex = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: selected ? brightGold : Colors.transparent, width: 3))),
+          child: Text(title, textAlign: TextAlign.center, style: TextStyle(color: selected ? brightGold : const Color(0xFFB7A48B), fontSize: 10.5, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
+        ),
+      ),
+    );
+  }
+
+  void _showAllBadges(BuildContext context, List<String> badges) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFFF7E9CC),
+      backgroundColor: cream,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (_) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Expanded(child: Text('My Badge Collection', style: TextStyle(color: Color(0xFF70430E), fontSize: 20, fontWeight: FontWeight.w900))),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Color(0xFF70430E))),
+              const Expanded(child: Text('My Badge Collection', style: TextStyle(color: brown, fontSize: 20, fontWeight: FontWeight.w900))),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: brown)),
             ]),
             const SizedBox(height: 12),
-            if (badges.isEmpty)
-              const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Belum ada badge.', style: TextStyle(color: Color(0xFF927655)))))
-            else
-              Wrap(spacing: 14, runSpacing: 14, children: badges.asMap().entries.map((e) => _BadgeTile(label: e.value, size: 66, variant: e.key)).toList()),
+            Wrap(spacing: 12, runSpacing: 12, children: badges.asMap().entries.map((e) => _PVBadgeTile(url: e.value, size: 66)).toList()),
           ]),
         ),
       ),
     );
   }
+}
+
+enum _PVLevelKind { wealth, charm, game }
+
+class _PVLevelCard extends StatelessWidget {
+  final int level;
+  final String label;
+  final _PVLevelKind kind;
+  const _PVLevelCard({required this.level, required this.label, required this.kind});
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = kind == _PVLevelKind.wealth ? Icons.workspace_premium_rounded : kind == _PVLevelKind.charm ? Icons.favorite_rounded : Icons.sports_esports_rounded;
+    final accent = kind == _PVLevelKind.charm ? const Color(0xFFD879A7) : kind == _PVLevelKind.game ? const Color(0xFF7B634B) : const Color(0xFFD4A63A);
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFFFF7DF), Color(0xFFF3D9A1)]),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFD4A63A), width: 1.3),
+        boxShadow: const [BoxShadow(color: Color(0x44000000), blurRadius: 5, offset: Offset(0, 2))],
+      ),
+      child: Row(children: [
+        Container(
+          width: 39,
+          height: 39,
+          decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [accent, const Color(0xFFFFE69A)]), border: Border.all(color: const Color(0xFFFFF1B7), width: 2), boxShadow: const [BoxShadow(color: Color(0x553B220A), blurRadius: 4)]),
+          child: Icon(icon, color: Colors.white, size: 19),
+        ),
+        const SizedBox(width: 5),
+        Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('LV $level', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF5A3617), fontSize: 10.5, fontWeight: FontWeight.w900)),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF8B6A43), fontSize: 7.5, fontWeight: FontWeight.w900, letterSpacing: .6)),
+        ])),
+      ]),
+    );
+  }
+}
+
+class _PVBadgeTile extends StatelessWidget {
+  final String url;
+  final double size;
+  const _PVBadgeTile({required this.url, this.size = 50});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Color(0xFFFFF1B1), Color(0xFFD49A28)]), border: Border.all(color: const Color(0xFFB9811B), width: 1.2), boxShadow: const [BoxShadow(color: Color(0x442B1607), blurRadius: 4, offset: Offset(0, 2))]),
+      padding: const EdgeInsets.all(3),
+      child: ClipOval(
+        child: url.isNotEmpty ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const _PVBadgeFallback()) : const _PVBadgeFallback(),
+      ),
+    );
+  }
+}
+
+class _PVBadgeFallback extends StatelessWidget {
+  const _PVBadgeFallback();
+  @override
+  Widget build(BuildContext context) => Container(color: const Color(0xFFF7E4B0), child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFD4A63A), size: 24));
+}
+
+class _PVStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _PVStat(this.value, this.label);
+  @override
+  Widget build(BuildContext context) => Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(value, style: const TextStyle(color: Color(0xFF4A280D), fontSize: 19, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(label, style: const TextStyle(color: Color(0xFF8A6A45), fontSize: 9.5, fontWeight: FontWeight.w800))]);
+}
+
+class _PVDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(width: 1, height: 34, color: const Color(0x66D4A63A));
+}
+
+class _PVInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _PVInfoChip({required this.icon, required this.text});
+  @override
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: const Color(0x66371908), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0x66FFE19A))), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white, size: 11), const SizedBox(width: 3), Text(text, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w700))]));
+}
+
+class _PVMiniCrown extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFD75A), size: 36);
+}
+
+class _PVHeroPanelPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(46));
+    final fill = Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xDD7B4615), Color(0xE05A2C08)]).createShader(Offset.zero & size);
+    canvas.drawRRect(r, fill);
+    final border = Paint()..style = PaintingStyle.stroke..strokeWidth = 1.6..color = const Color(0xFFE7C45E);
+    canvas.drawRRect(r.deflate(1), border);
+    final inner = Paint()..style = PaintingStyle.stroke..strokeWidth = .8..color = const Color(0x66FFE7A0);
+    canvas.drawRRect(r.deflate(7), inner);
+  }
+  @override
+  bool shouldRepaint(covariant _PVHeroPanelPainter oldDelegate) => false;
 }
 
 class _ProfileViewBackdrop extends StatelessWidget {
