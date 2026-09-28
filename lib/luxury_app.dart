@@ -11,7 +11,19 @@ import 'economy_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  // Initialize Firebase explicitly so the APK does not depend on
+  // google-services.json/plugin auto-discovery at runtime.
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: 'AIzaSyCIQdR02RmBQGL7GLixGHZ8b7uNKBUfNvg',
+      appId: '1:909111719371:android:f0914e19390e0d6885b24e',
+      messagingSenderId: '909111719371',
+      projectId: 'cuan-party',
+      storageBucket: 'cuan-party.firebasestorage.app',
+    ),
+  );
+
   runApp(const CuanPartyApp());
 }
 
