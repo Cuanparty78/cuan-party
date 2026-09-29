@@ -9,23 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'economy_service.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase explicitly so the APK does not depend on
-  // google-services.json/plugin auto-discovery at runtime.
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'AIzaSyCIQdR02RmBQGL7GLixGHZ8b7uNKBUfNvg',
-      appId: '1:909111719371:android:f0914e19390e0d6885b24e',
-      messagingSenderId: '909111719371',
-      projectId: 'cuan-party',
-      storageBucket: 'cuan-party.firebasestorage.app',
-    ),
-  );
-
-  runApp(const CuanPartyApp());
-}
+void main() => runApp(const CuanPartyApp());
 
 class _RealtimeEconomyBuilder extends StatelessWidget {
   const _RealtimeEconomyBuilder({required this.uid, required this.builder});
@@ -4390,269 +4374,97 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
+    Widget render(Map<String, dynamic> data) {
+      final name = '${data['displayName'] ?? 'User'}'.trim();
+      final id = '${data['cuanId'] ?? widget.userId}'.trim();
+      final photo = '${data['photoUrl'] ?? ''}'.trim();
+      final gender = '${data['gender'] ?? 'Laki-laki'}'.trim();
+      final country = '${data['country'] ?? 'Indonesia'}'.trim();
+      final wealth = _num(data['wealthLevel']);
+      final charm = _num(data['charmLevel']);
+      final game = _num(data['gameLevel']);
+      final followers = _num(data['followersCount'] ?? data['followers']);
+      final following = _num(data['followingCount'] ?? data['following']);
+      final visitors = _num(data['visitorsCount'] ?? data['visitors']);
+      final badges = _stringList(data['badges'], 10);
+      final allBadges = _stringList(data['badges'], 9999);
+      final frames = _stringList(data['frames'] ?? data['ownedFrames'], 9999);
+      final gifts = _stringList(data['gifts'] ?? data['receivedGifts'], 9999);
+      final cp = _stringList(data['cp'] ?? data['partners'], 5);
+      final family = '${data['familyId'] ?? data['familyName'] ?? ''}'.trim();
+      final profilePhotos = _profilePhotoList(data, photo);
+      final sx = (v) => _x(v, size.width);
+      final sy = (v) => _y(v, size.height);
+
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: Image(
+              image: _profileBgImage,
+              fit: BoxFit.fill,
+              filterQuality: FilterQuality.high,
+              gaplessPlayback: true,
+            ),
+          ),
+          Positioned(
+            left: 0, right: 0, top: 0, height: sy(_photoH),
+            child: _ProfilePhotoCarousel(
+              photos: profilePhotos,
+              onOpen: (index) => _openPhotoViewer(context, profilePhotos, index),
+            ),
+          ),
+          Positioned(top: sy(42), left: sx(22), child: _RoundIconButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.maybePop(context))),
+          Positioned(top: sy(42), right: sx(22), child: _RoundIconButton(icon: Icons.edit_rounded, onTap: () => _showMessage(context, 'Edit Profil'))),
+          Positioned(top: sy(43), left: sx(100), right: sx(100), child: const Text('Profile', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 6)]))),
+          Positioned(
+            left: sx(241), top: sy(645), width: sx(220), height: sy(220),
+            child: GestureDetector(
+              onTap: () => _showMessage(context, 'Ganti foto profil'),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF963FC1),
+                  border: Border.all(color: const Color(0xFFFFD86A), width: 3),
+                  image: photo.isNotEmpty ? DecorationImage(image: NetworkImage(photo), fit: BoxFit.cover) : null,
+                ),
+                alignment: Alignment.center,
+                child: photo.isEmpty ? const Text('A', style: TextStyle(color: Colors.white, fontSize: 58, fontWeight: FontWeight.w300)) : null,
+              ),
+            ),
+          ),
+          Positioned(left: sx(135), right: sx(135), top: sy(862), height: sy(74), child: Center(child: Text(name.isEmpty ? 'User' : name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: _brown, fontSize: 22, fontWeight: FontWeight.w900)))),
+          Positioned(
+            left: sx(155), right: sx(155), top: sy(948), height: sy(34),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              FittedBox(child: Text('${_genderIcon(gender)}  ${gender.isEmpty ? 'Laki-laki' : gender}     |     ${_flagForCountry(country)}  ${country.isEmpty ? 'Indonesia' : country}', style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 12.5, fontWeight: FontWeight.w800))),
+              const SizedBox(height: 2),
+              FittedBox(child: Text('ID : $id   ⧉', style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 11.5, fontWeight: FontWeight.w900))),
+            ]),
+          ),
+          Positioned(left: sx(235), right: sx(235), top: sy(982), height: sy(40), child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () async { await Clipboard.setData(ClipboardData(text: id)); if (context.mounted) _showMessage(context, 'ID berhasil disalin'); }, child: const SizedBox.expand())),
+          Positioned(left: sx(58), right: sx(58), top: sy(1018), height: sy(83), child: Row(children: [Expanded(child: _PVLevelText(title: 'WEALTH', level: wealth)), SizedBox(width: sx(8)), Expanded(child: _PVLevelText(title: 'CHARM', level: charm)), SizedBox(width: sx(8)), Expanded(child: _PVLevelText(title: 'GAME', level: game))])),
+          Positioned(left: sx(58), right: sx(58), top: sy(1105), height: sy(84), child: _PVStatsText(followers: followers, following: following, visitors: visitors)),
+          Positioned(left: sx(58), right: sx(58), top: sy(1218), height: sy(205), child: GridView.builder(physics: const NeverScrollableScrollPhysics(), itemCount: 10, padding: EdgeInsets.zero, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 7, crossAxisSpacing: 12, childAspectRatio: 1), itemBuilder: (_, index) => GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _showBadgeZoom(context, index < badges.length ? badges[index] : ''), child: _PVBadgeSlot(url: index < badges.length ? badges[index] : '')))),
+          Positioned(left: sx(174), right: sx(174), top: sy(1426), height: sy(48), child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _showBadgeCollection(context, allBadges), child: const Center(child: Text('Lihat semua  >', style: TextStyle(color: _brown, fontSize: 13, fontWeight: FontWeight.w900))))),
+          Positioned(left: 0, right: 0, bottom: 0, height: sy(125), child: Row(children: [Expanded(child: _PVBottomTab(label: 'RELATIONSHIPS', onTap: () => _openTab(context, 0, cp: cp, family: family))), Expanded(child: _PVBottomTab(label: 'FRAME', onTap: () => _openTab(context, 1, frames: frames))), Expanded(child: _PVBottomTab(label: 'GIFT', onTap: () => _openTab(context, 2, gifts: gifts)))])),
+        ],
+      );
+    }
+
+    // IMPORTANT: ProfileView must render even when Firebase has not been initialized.
+    // If Firebase is available, live user data is used; otherwise safe local defaults are shown.
+    final firebaseReady = Firebase.apps.isNotEmpty;
+    if (!firebaseReady) {
+      return Scaffold(backgroundColor: Colors.black, body: render(const <String, dynamic>{}));
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance.collection('users').doc(widget.userId).snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: _gold));
-          }
-
-          if (snapshot.hasError) {
-            return Container(
-              color: const Color(0xFFFFF7E5),
-              alignment: Alignment.center,
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline_rounded, color: _brown, size: 48),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Profile gagal dimuat',
-                    style: TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: _brown, fontSize: 12),
-                  ),
-                  const SizedBox(height: 18),
-                  FilledButton(
-                    onPressed: () => setState(() {}),
-                    child: const Text('Coba lagi'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final data = snapshot.data?.data() ?? <String, dynamic>{};
-          final name = '${data['displayName'] ?? 'User'}'.trim();
-          final id = '${data['cuanId'] ?? widget.userId}'.trim();
-          final photo = '${data['photoUrl'] ?? ''}'.trim();
-          final gender = '${data['gender'] ?? 'Laki-laki'}'.trim();
-          final country = '${data['country'] ?? 'Indonesia'}'.trim();
-          final wealth = _num(data['wealthLevel']);
-          final charm = _num(data['charmLevel']);
-          final game = _num(data['gameLevel']);
-          final followers = _num(data['followersCount'] ?? data['followers']);
-          final following = _num(data['followingCount'] ?? data['following']);
-          final visitors = _num(data['visitorsCount'] ?? data['visitors']);
-          final badges = _stringList(data['badges'], 10);
-          final allBadges = _stringList(data['badges'], 9999);
-          final frames = _stringList(data['frames'] ?? data['ownedFrames'], 9999);
-          final gifts = _stringList(data['gifts'] ?? data['receivedGifts'], 9999);
-          final cp = _stringList(data['cp'] ?? data['partners'], 5);
-          final family = '${data['familyId'] ?? data['familyName'] ?? ''}'.trim();
-          final profilePhotos = _profilePhotoList(data, photo);
-
-          final sx = (v) => _x(v, size.width);
-          final sy = (v) => _y(v, size.height);
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // Exact 702x1600 master artwork. Transparent top 503px is reserved for the photo carousel; all overlay coordinates use the same system.
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Image(
-                    image: _profileBgImage,
-                    fit: BoxFit.fill,
-                    filterQuality: FilterQuality.high,
-                    gaplessPlayback: true,
-                  ),
-                ),
-              ),
-
-
-              // The upper photo area is deliberately NOT part of the artwork.
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                height: sy(_photoH),
-                child: _ProfilePhotoCarousel(
-                  photos: profilePhotos,
-                  onOpen: (index) => _openPhotoViewer(context, profilePhotos, index),
-                ),
-              ),
-
-// Header controls sit over the photo carousel.
-              Positioned(
-                top: sy(42),
-                left: sx(22),
-                child: _RoundIconButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.maybePop(context)),
-              ),
-              Positioned(
-                top: sy(42),
-                right: sx(22),
-                child: _RoundIconButton(icon: Icons.edit_rounded, onTap: () => _showMessage(context, 'Edit Profil')),
-              ),
-              Positioned(
-                top: sy(43),
-                left: sx(100),
-                right: sx(100),
-                child: const Text(
-                  'Profile',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 6)]),
-                ),
-              ),
-
-              // Avatar: centered exactly on the artwork's circular opening.
-              Positioned(
-                left: sx(241),
-                top: sy(645),
-                width: sx(220),
-                height: sy(220),
-                child: GestureDetector(
-                  onTap: () => _showMessage(context, 'Ganti foto profil'),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF963FC1),
-                      border: Border.all(color: const Color(0xFFFFD86A), width: 3),
-                      image: photo.isNotEmpty ? DecorationImage(image: NetworkImage(photo), fit: BoxFit.cover) : null,
-                    ),
-                    alignment: Alignment.center,
-                    child: photo.isEmpty ? const Text('A', style: TextStyle(color: Colors.white, fontSize: 58, fontWeight: FontWeight.w300)) : null,
-                  ),
-                ),
-              ),
-
-              // Name plate.
-              Positioned(
-                left: sx(135),
-                right: sx(135),
-                top: sy(862),
-                height: sy(74),
-                child: Center(
-                  child: Text(
-                    name.isEmpty ? 'User' : name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: _brown, fontSize: 22, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-
-              // Gender / country plate.
-              Positioned(
-                left: sx(155),
-                right: sx(155),
-                top: sy(948),
-                height: sy(34),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FittedBox(
-                      child: Text(
-                        '${_genderIcon(gender)}  ${gender.isEmpty ? 'Laki-laki' : gender}     |     ${_flagForCountry(country)}  ${country.isEmpty ? 'Indonesia' : country}',
-                        style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 12.5, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    FittedBox(
-                      child: Text('ID : $id   ⧉', style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 11.5, fontWeight: FontWeight.w900)),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ID plate; tap copies the real user ID.
-              Positioned(
-                left: sx(235),
-                right: sx(235),
-                top: sy(982),
-                height: sy(40),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () async {
-                    await Clipboard.setData(ClipboardData(text: id));
-                    if (context.mounted) _showMessage(context, 'ID berhasil disalin');
-                  },
-                  child: const SizedBox.expand(),
-                ),
-              ),
-
-              // Level cards align to the three empty artwork cards.
-              Positioned(
-                left: sx(58),
-                right: sx(58),
-                top: sy(1018),
-                height: sy(83),
-                child: Row(
-                  children: [
-                    Expanded(child: _PVLevelText(title: 'WEALTH', level: wealth)),
-                    SizedBox(width: sx(8)),
-                    Expanded(child: _PVLevelText(title: 'CHARM', level: charm)),
-                    SizedBox(width: sx(8)),
-                    Expanded(child: _PVLevelText(title: 'GAME', level: game)),
-                  ],
-                ),
-              ),
-
-              // Stats align to the long artwork panel.
-              Positioned(
-                left: sx(58),
-                right: sx(58),
-                top: sy(1105),
-                height: sy(84),
-                child: _PVStatsText(followers: followers, following: following, visitors: visitors),
-              ),
-
-              // Badge title is already drawn into the artwork; only place the 10 real badges on its slots.
-              Positioned(
-                left: sx(58),
-                right: sx(58),
-                top: sy(1218),
-                height: sy(205),
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: 10,
-                  padding: EdgeInsets.zero,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 7, crossAxisSpacing: 12, childAspectRatio: 1),
-                  itemBuilder: (_, index) => GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _showBadgeZoom(context, index < badges.length ? badges[index] : ''),
-                    child: _PVBadgeSlot(url: index < badges.length ? badges[index] : ''),
-                  ),
-                ),
-              ),
-
-              // Artwork has a blank button under the badge grid. Keep it as a real Flutter hit area.
-              Positioned(
-                left: sx(174),
-                right: sx(174),
-                top: sy(1426),
-                height: sy(48),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _showBadgeCollection(context, allBadges),
-                  child: const Center(child: Text('Lihat semua  >', style: TextStyle(color: _brown, fontSize: 13, fontWeight: FontWeight.w900))),
-                ),
-              ),
-
-              // Bottom navigation is part of the artwork visually, but the three areas remain real Flutter buttons.
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: sy(125),
-                child: Row(
-                  children: [
-                    Expanded(child: _PVBottomTab(label: 'RELATIONSHIPS', onTap: () => _openTab(context, 0, cp: cp, family: family))),
-                    Expanded(child: _PVBottomTab(label: 'FRAME', onTap: () => _openTab(context, 1, frames: frames))),
-                    Expanded(child: _PVBottomTab(label: 'GIFT', onTap: () => _openTab(context, 2, gifts: gifts))),
-                  ],
-                ),
-              ),
-            ],
-          );
+          return render(snapshot.data?.data() ?? const <String, dynamic>{});
         },
       ),
     );
