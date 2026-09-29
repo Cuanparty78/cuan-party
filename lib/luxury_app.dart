@@ -4486,7 +4486,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
               children: [
                 FittedBox(
                   child: Text(
-                    '${_genderIcon(gender)}  $gender     |     ${_flagForCountry(country)}  $country',
+                    '${gender.toLowerCase().contains('perempuan') ? '♀' : '♂'}  $gender     |     🇮🇩  $country',
                     style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 12.5, fontWeight: FontWeight.w800),
                   ),
                 ),
