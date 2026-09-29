@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'economy_service.dart';
 
@@ -4351,74 +4350,99 @@ class ProfileViewPage extends StatefulWidget {
   State<ProfileViewPage> createState() => _ProfileViewPageState();
 }
 
+/// Profile View is deliberately UI-first: it does NOT wait for Firestore.
+/// The page must always render immediately; backend data can be wired in later.
 class _ProfileViewPageState extends State<ProfileViewPage> {
   int _selectedTabIndex = 0;
-  late final MemoryImage _profileBgImage = MemoryImage(base64Decode(_profileViewBgBase64));
 
   static const _gold = Color(0xFFE0A936);
   static const _cream = Color(0xFFFFF7E5);
   static const _brown = Color(0xFF5A2F0A);
-  static const _darkBrown = Color(0xFF351A06);
-
-  // Master artwork coordinate system: 702 x 1600.
-  static const double _designW = 702;
-  static const double _designH = 1600;
-  static const double _photoH = 503;
+  static const _designW = 702.0;
+  static const _designH = 1600.0;
+  static const _photoH = 503.0;
 
   double _x(double value, double w) => value * w / _designW;
   double _y(double value, double h) => value * h / _designH;
-  double _w(double value, double w) => value * w / _designW;
-  double _h(double value, double h) => value * h / _designH;
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final sx = (double v) => _x(v, size.width);
+    final sy = (double v) => _y(v, size.height);
 
-    Widget render(Map<String, dynamic> data) {
-      final name = '${data['displayName'] ?? 'User'}'.trim();
-      final id = '${data['cuanId'] ?? widget.userId}'.trim();
-      final photo = '${data['photoUrl'] ?? ''}'.trim();
-      final gender = '${data['gender'] ?? 'Laki-laki'}'.trim();
-      final country = '${data['country'] ?? 'Indonesia'}'.trim();
-      final wealth = _num(data['wealthLevel']);
-      final charm = _num(data['charmLevel']);
-      final game = _num(data['gameLevel']);
-      final followers = _num(data['followersCount'] ?? data['followers']);
-      final following = _num(data['followingCount'] ?? data['following']);
-      final visitors = _num(data['visitorsCount'] ?? data['visitors']);
-      final badges = _stringList(data['badges'], 10);
-      final allBadges = _stringList(data['badges'], 9999);
-      final frames = _stringList(data['frames'] ?? data['ownedFrames'], 9999);
-      final gifts = _stringList(data['gifts'] ?? data['receivedGifts'], 9999);
-      final cp = _stringList(data['cp'] ?? data['partners'], 5);
-      final family = '${data['familyId'] ?? data['familyName'] ?? ''}'.trim();
-      final profilePhotos = _profilePhotoList(data, photo);
-      final sx = (v) => _x(v, size.width);
-      final sy = (v) => _y(v, size.height);
+    // Safe local/default data. No Firestore call is needed to paint the page.
+    final name = AppProfileState.name.value.trim().isEmpty ? 'CUAN PARTY' : AppProfileState.name.value.trim();
+    final id = AppProfileState.cuanId.value.trim().isEmpty ? widget.userId : AppProfileState.cuanId.value.trim();
+    final gender = AppProfileState.gender.value.trim().isEmpty ? 'Laki-laki' : AppProfileState.gender.value.trim();
+    final country = AppProfileState.country.value.trim().isEmpty ? 'Indonesia' : AppProfileState.country.value.trim();
+    final level = AppProfileState.level.value < 1 ? 1 : AppProfileState.level.value;
 
-      return Stack(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
         fit: StackFit.expand,
         children: [
+          // IMPORTANT: background is painted synchronously; no StreamBuilder.
           Positioned.fill(
-            child: Image(
-              image: _profileBgImage,
+            child: Image.memory(
+              base64Decode(_profileViewBgBase64),
               fit: BoxFit.fill,
               filterQuality: FilterQuality.high,
               gaplessPlayback: true,
             ),
           ),
+
+          // Top photo area. Empty by default so the artwork remains visible below.
           Positioned(
-            left: 0, right: 0, top: 0, height: sy(_photoH),
-            child: _ProfilePhotoCarousel(
-              photos: profilePhotos,
-              onOpen: (index) => _openPhotoViewer(context, profilePhotos, index),
+            left: 0,
+            right: 0,
+            top: 0,
+            height: sy(_photoH),
+            child: Container(
+              color: const Color(0xFF17110D),
+              alignment: Alignment.center,
+              child: const Icon(Icons.person_rounded, color: Colors.white24, size: 72),
             ),
           ),
-          Positioned(top: sy(42), left: sx(22), child: _RoundIconButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.maybePop(context))),
-          Positioned(top: sy(42), right: sx(22), child: _RoundIconButton(icon: Icons.edit_rounded, onTap: () => _showMessage(context, 'Edit Profil'))),
-          Positioned(top: sy(43), left: sx(100), right: sx(100), child: const Text('Profile', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 6)]))),
+
           Positioned(
-            left: sx(241), top: sy(645), width: sx(220), height: sy(220),
+            top: sy(42),
+            left: sx(22),
+            child: _RoundIconButton(
+              icon: Icons.arrow_back_rounded,
+              onTap: () => Navigator.maybePop(context),
+            ),
+          ),
+          Positioned(
+            top: sy(42),
+            right: sx(22),
+            child: _RoundIconButton(
+              icon: Icons.edit_rounded,
+              onTap: () => _showMessage(context, 'Edit Profil'),
+            ),
+          ),
+          Positioned(
+            top: sy(43),
+            left: sx(100),
+            right: sx(100),
+            child: const Text(
+              'Profile',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 27,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: sx(241),
+            top: sy(645),
+            width: sx(220),
+            height: sy(220),
             child: GestureDetector(
               onTap: () => _showMessage(context, 'Ganti foto profil'),
               child: Container(
@@ -4426,211 +4450,135 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                   shape: BoxShape.circle,
                   color: const Color(0xFF963FC1),
                   border: Border.all(color: const Color(0xFFFFD86A), width: 3),
-                  image: photo.isNotEmpty ? DecorationImage(image: NetworkImage(photo), fit: BoxFit.cover) : null,
                 ),
                 alignment: Alignment.center,
-                child: photo.isEmpty ? const Text('A', style: TextStyle(color: Colors.white, fontSize: 58, fontWeight: FontWeight.w300)) : null,
+                child: const Text(
+                  'A',
+                  style: TextStyle(color: Colors.white, fontSize: 58, fontWeight: FontWeight.w300),
+                ),
               ),
             ),
           ),
-          Positioned(left: sx(135), right: sx(135), top: sy(862), height: sy(74), child: Center(child: Text(name.isEmpty ? 'User' : name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: _brown, fontSize: 22, fontWeight: FontWeight.w900)))),
+
           Positioned(
-            left: sx(155), right: sx(155), top: sy(948), height: sy(34),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              FittedBox(child: Text('${_genderIcon(gender)}  ${gender.isEmpty ? 'Laki-laki' : gender}     |     ${_flagForCountry(country)}  ${country.isEmpty ? 'Indonesia' : country}', style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 12.5, fontWeight: FontWeight.w800))),
-              const SizedBox(height: 2),
-              FittedBox(child: Text('ID : $id   ⧉', style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 11.5, fontWeight: FontWeight.w900))),
-            ]),
-          ),
-          Positioned(left: sx(235), right: sx(235), top: sy(982), height: sy(40), child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () async { await Clipboard.setData(ClipboardData(text: id)); if (context.mounted) _showMessage(context, 'ID berhasil disalin'); }, child: const SizedBox.expand())),
-          Positioned(left: sx(58), right: sx(58), top: sy(1018), height: sy(83), child: Row(children: [Expanded(child: _PVLevelText(title: 'WEALTH', level: wealth)), SizedBox(width: sx(8)), Expanded(child: _PVLevelText(title: 'CHARM', level: charm)), SizedBox(width: sx(8)), Expanded(child: _PVLevelText(title: 'GAME', level: game))])),
-          Positioned(left: sx(58), right: sx(58), top: sy(1105), height: sy(84), child: _PVStatsText(followers: followers, following: following, visitors: visitors)),
-          Positioned(left: sx(58), right: sx(58), top: sy(1218), height: sy(205), child: GridView.builder(physics: const NeverScrollableScrollPhysics(), itemCount: 10, padding: EdgeInsets.zero, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 7, crossAxisSpacing: 12, childAspectRatio: 1), itemBuilder: (_, index) => GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _showBadgeZoom(context, index < badges.length ? badges[index] : ''), child: _PVBadgeSlot(url: index < badges.length ? badges[index] : '')))),
-          Positioned(left: sx(174), right: sx(174), top: sy(1426), height: sy(48), child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _showBadgeCollection(context, allBadges), child: const Center(child: Text('Lihat semua  >', style: TextStyle(color: _brown, fontSize: 13, fontWeight: FontWeight.w900))))),
-          Positioned(left: 0, right: 0, bottom: 0, height: sy(125), child: Row(children: [Expanded(child: _PVBottomTab(label: 'RELATIONSHIPS', onTap: () => _openTab(context, 0, cp: cp, family: family))), Expanded(child: _PVBottomTab(label: 'FRAME', onTap: () => _openTab(context, 1, frames: frames))), Expanded(child: _PVBottomTab(label: 'GIFT', onTap: () => _openTab(context, 2, gifts: gifts)))])),
-        ],
-      );
-    }
-
-    // IMPORTANT: ProfileView must render even when Firebase has not been initialized.
-    // If Firebase is available, live user data is used; otherwise safe local defaults are shown.
-    final firebaseReady = Firebase.apps.isNotEmpty;
-    if (!firebaseReady) {
-      return Scaffold(backgroundColor: Colors.black, body: render(const <String, dynamic>{}));
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('users').doc(widget.userId).snapshots(),
-        builder: (context, snapshot) {
-          return render(snapshot.data?.data() ?? const <String, dynamic>{});
-        },
-      ),
-    );
-  }
-
-  List<String> _profilePhotoList(Map<String, dynamic> data, String fallback) {
-    final raw = data['profilePhotos'] ?? data['photos'] ?? data['profileImages'] ?? data['galleryPhotos'];
-    final list = raw is List
-        ? raw.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).take(5).toList()
-        : <String>[];
-    if (list.isEmpty && fallback.isNotEmpty) list.add(fallback);
-    return list;
-  }
-
-  void _openPhotoViewer(BuildContext context, List<String> photos, int index) {
-    if (photos.isEmpty) return;
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => _ProfilePhotoViewer(photos: photos, initialIndex: index)));
-  }
-
-  void _openTab(BuildContext context, int tab, {List<String> cp = const [], String family = '', List<String> frames = const [], List<String> gifts = const []}) {
-    setState(() => _selectedTabIndex = tab);
-    final title = tab == 0 ? 'RELATIONSHIPS' : tab == 1 ? 'FRAME' : 'GIFT';
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: .58,
-        minChildSize: .34,
-        maxChildSize: .92,
-        expand: false,
-        builder: (_, controller) => Container(
-          decoration: const BoxDecoration(color: _cream, borderRadius: BorderRadius.vertical(top: Radius.circular(28)), border: Border(top: BorderSide(color: _gold, width: 2))),
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
-            children: [
-              Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: _gold, borderRadius: BorderRadius.circular(10)))),
-              const SizedBox(height: 12),
-              Text(title, textAlign: TextAlign.center, style: const TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              const SizedBox(height: 16),
-              if (tab == 0) ..._relationshipContent(sheetContext, cp, family),
-              if (tab == 1) _assetGrid('FRAME YANG DIMILIKI', frames, Icons.photo_library_rounded),
-              if (tab == 2) _assetGrid('GIFT YANG DITERIMA', gifts, Icons.card_giftcard_rounded),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _relationshipContent(BuildContext context, List<String> cp, String family) {
-    return [
-      const Text('CP', style: TextStyle(color: _brown, fontSize: 16, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 10),
-      if (cp.isEmpty)
-        const _EmptyRow(text: 'Belum ada CP')
-      else
-        SizedBox(
-          height: 92,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: cp.length.clamp(0, 5),
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => GestureDetector(
-              onTap: () => _showMessage(context, 'Buka Profile CP: ${cp[i]}'),
-              child: Column(children: [
-                CircleAvatar(radius: 30, backgroundColor: const Color(0xFFE6B95A), child: Text('${i + 1}', style: const TextStyle(color: _brown, fontWeight: FontWeight.w900))),
-                const SizedBox(height: 5),
-                SizedBox(width: 62, child: Text(cp[i], maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: _brown, fontSize: 10, fontWeight: FontWeight.w700))),
-              ]),
+            left: sx(135),
+            right: sx(135),
+            top: sy(862),
+            height: sy(74),
+            child: Center(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _brown, fontSize: 22, fontWeight: FontWeight.w900),
+              ),
             ),
           ),
-        ),
-      const SizedBox(height: 18),
-      const Text('FAMILY', style: TextStyle(color: _brown, fontSize: 16, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 10),
-      GestureDetector(
-        onTap: family.isEmpty ? null : () => _showMessage(context, 'Buka Profile Family: $family'),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: BorderRadius.circular(18), border: Border.all(color: _gold)),
-          child: Row(children: [
-            const CircleAvatar(radius: 25, backgroundColor: Color(0xFFDCA83C), child: Icon(Icons.groups_rounded, color: _brown)),
-            const SizedBox(width: 12),
-            Expanded(child: Text(family.isEmpty ? 'Belum bergabung Family' : family, style: const TextStyle(color: _brown, fontWeight: FontWeight.w900))),
-            const Icon(Icons.chevron_right_rounded, color: _brown),
-          ]),
-        ),
-      ),
-    ];
-  }
 
-  Widget _assetGrid(String heading, List<String> items, IconData fallback) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(heading, style: const TextStyle(color: _brown, fontSize: 14, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 10),
-      if (items.isEmpty)
-        const _EmptyRow(text: 'Belum ada data')
-      else
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 12, childAspectRatio: .82),
-          itemBuilder: (_, i) => Container(
-            decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: BorderRadius.circular(18), border: Border.all(color: _gold)),
-            padding: const EdgeInsets.all(8),
-            child: items[i].startsWith('http')
-                ? Image.network(items[i], fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(fallback, color: _gold, size: 36))
-                : Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(fallback, color: _gold, size: 36), const SizedBox(height: 6), Text(items[i], maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: _brown, fontSize: 10, fontWeight: FontWeight.w700))]),
+          Positioned(
+            left: sx(155),
+            right: sx(155),
+            top: sy(948),
+            height: sy(34),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FittedBox(
+                  child: Text(
+                    '${_genderIcon(gender)}  $gender     |     ${_flagForCountry(country)}  $country',
+                    style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 12.5, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                FittedBox(
+                  child: Text(
+                    'ID : $id   ⧉',
+                    style: const TextStyle(color: Color(0xFFFFF4D6), fontSize: 11.5, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-    ]);
-  }
 
-  void _showBadgeCollection(BuildContext context, List<String> badges) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: .75,
-        maxChildSize: .94,
-        minChildSize: .4,
-        builder: (_, controller) => Container(
-          decoration: const BoxDecoration(color: _cream, borderRadius: BorderRadius.vertical(top: Radius.circular(28)), border: Border(top: BorderSide(color: _gold, width: 2))),
-          child: GridView.builder(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(18, 20, 18, 35),
-            itemCount: badges.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 10, mainAxisSpacing: 14),
-            itemBuilder: (_, i) => GestureDetector(onTap: () => _showBadgeZoom(context, badges[i]), child: _PVBadgeSlot(url: badges[i])),
+          Positioned(
+            left: sx(58),
+            right: sx(58),
+            top: sy(1018),
+            height: sy(83),
+            child: Row(
+              children: [
+                Expanded(child: _PVLevelText(title: 'WEALTH', level: level)),
+                SizedBox(width: sx(8)),
+                Expanded(child: _PVLevelText(title: 'CHARM', level: level)),
+                SizedBox(width: sx(8)),
+                Expanded(child: _PVLevelText(title: 'GAME', level: level)),
+              ],
+            ),
           ),
-        ),
+
+          Positioned(
+            left: sx(58),
+            right: sx(58),
+            top: sy(1105),
+            height: sy(84),
+            child: const _PVStatsText(followers: 0, following: 0, visitors: 0),
+          ),
+
+          Positioned(
+            left: sx(58),
+            right: sx(58),
+            top: sy(1218),
+            height: sy(205),
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 10,
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                mainAxisSpacing: 7,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1,
+              ),
+              itemBuilder: (_, index) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _showMessage(context, 'Badge ${index + 1}'),
+                child: const _PVBadgeSlot(url: ''),
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: sx(174),
+            right: sx(174),
+            top: sy(1426),
+            height: sy(48),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _showMessage(context, 'Semua badge'),
+              child: const Center(
+                child: Text('Lihat semua  >', style: TextStyle(color: _brown, fontSize: 13, fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: sy(125),
+            child: Row(
+              children: [
+                Expanded(child: _PVBottomTab(label: 'RELATIONSHIPS', onTap: () => _showMessage(context, 'RELATIONSHIPS'))),
+                Expanded(child: _PVBottomTab(label: 'FRAME', onTap: () => _showMessage(context, 'FRAME'))),
+                Expanded(child: _PVBottomTab(label: 'GIFT', onTap: () => _showMessage(context, 'GIFT'))),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  void _showBadgeZoom(BuildContext context, String url) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(.82),
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(24),
-        child: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(color: _cream, borderRadius: BorderRadius.circular(26), border: Border.all(color: _gold, width: 2)),
-            child: url.startsWith('http') ? Image.network(url, fit: BoxFit.contain, height: 310) : const SizedBox(height: 240, child: Center(child: Text('Badge belum tersedia', style: TextStyle(color: _brown, fontWeight: FontWeight.w800))),),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
-  }
-
-  static int _num(dynamic v) => v is num ? v.toInt().clamp(0, 999999999) : 0;
-  static List<String> _stringList(dynamic value, int max) => value is List ? value.map((e) => '$e').where((e) => e.trim().isNotEmpty).take(max).toList() : <String>[];
-  static String _genderIcon(String gender) => gender.toLowerCase().contains('perempuan') || gender.toLowerCase().contains('female') ? '♀' : '♂';
-  static String _flagForCountry(String country) => country.toLowerCase().contains('indonesia') || country.isEmpty ? '🇮🇩' : '🌐';
 }
 
 class _ProfilePhotoCarousel extends StatefulWidget {
