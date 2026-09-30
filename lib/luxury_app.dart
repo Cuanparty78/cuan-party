@@ -4458,15 +4458,48 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
 
                   Positioned(left:_d(135,s),right:_d(135,s),top:_d(862,s),height:_d(62,s),child: Center(child: Text(name,maxLines:1,overflow:TextOverflow.ellipsis,textAlign:TextAlign.center,style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:22*s,fontWeight:FontWeight.w900)))),
                   Positioned(
-                    left:_d(125,s),right:_d(125,s),top:_d(932,s),height:_d(60,s),
-                    child: Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-                      FittedBox(child:Text('${gender.toLowerCase().contains('perempuan') ? '♀' : '♂'}  $gender     |     🇮🇩  $country',style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:13*s,fontWeight:FontWeight.w800))),
-                      SizedBox(height:_d(4,s)),
-                      GestureDetector(onTap:()=>_copyId(context,id),child:FittedBox(child:Text('ID : $id   ⧉',style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:12*s,fontWeight:FontWeight.w900)))),
-                    ]),
+                    left:_d(105,s),right:_d(105,s),top:_d(925,s),height:_d(72,s),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children:[
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal:_d(22,s), vertical:_d(7,s)),
+                          decoration: BoxDecoration(
+                            color: const Color(0xEFFFF8E9),
+                            borderRadius: BorderRadius.circular(_d(22,s)),
+                            border: Border.all(color: const Color(0xFFD7A33D), width:_d(1.2,s)),
+                            boxShadow: const [BoxShadow(color: Color(0x443B220A), blurRadius: 6, offset: Offset(0,2))],
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children:[
+                                Text(gender.toLowerCase().contains('perempuan') ? '♀' : '♂', style: TextStyle(color:const Color(0xFF7A4B12),fontSize:16*s,fontWeight:FontWeight.w900)),
+                                SizedBox(width:_d(6,s)),
+                                Text(gender, style: TextStyle(color:const Color(0xFF5A2F0A),fontSize:13*s,fontWeight:FontWeight.w900)),
+                                Padding(padding:EdgeInsets.symmetric(horizontal:_d(10,s)),child:Text('•',style:TextStyle(color:const Color(0xFFD09A2F),fontSize:13*s,fontWeight:FontWeight.w900))),
+                                Text(country.toLowerCase().contains('indonesia') ? '🇮🇩' : '🌐', style:TextStyle(fontSize:14*s)),
+                                SizedBox(width:_d(5,s)),
+                                Text(country, style: TextStyle(color:const Color(0xFF5A2F0A),fontSize:13*s,fontWeight:FontWeight.w900)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height:_d(4,s)),
+                        GestureDetector(
+                          onTap:()=>_copyId(context,id),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('ID : $id   ⧉',style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:12*s,fontWeight:FontWeight.w900)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
-                  Positioned(left:_d(58,s),right:_d(58,s),top:_d(990,s),height:_d(83,s),child:Row(children:[Expanded(child:_PVLevelText(title:'WEALTH',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'CHARM',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'GAME',level:level))])),
+
+                  Positioned(left:_d(58,s),right:_d(58,s),top:_d(990,s),height:_d(78,s),child:Row(children:[Expanded(child:_PVLevelText(title:'WEALTH',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'CHARM',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'GAME',level:level))])),
                   Positioned(
                     left:_d(58,s),
                     right:_d(58,s),
@@ -4476,6 +4509,20 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                   ),
                   Positioned(left:_d(58,s),right:_d(58,s),top:_d(1165,s),height:_d(225,s),child:GridView.builder(physics:const NeverScrollableScrollPhysics(),itemCount:10,padding:EdgeInsets.zero,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5,mainAxisSpacing:7,crossAxisSpacing:12,childAspectRatio:1),itemBuilder:(_,i)=>GestureDetector(behavior:HitTestBehavior.opaque,onTap:()=>_showMessage(context,'Badge ${i+1}'),child:const _PVBadgeSlot(url:'')))),
                   Positioned(left:_d(174,s),right:_d(174,s),top:_d(1398,s),height:_d(48,s),child:GestureDetector(behavior:HitTestBehavior.opaque,onTap:()=>_showMessage(context,'Semua badge'),child:Center(child:Text('Lihat semua  >',style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:13*s,fontWeight:FontWeight.w900))))),
+                  // Lighten the lower Relationships / Frame / Gift zone while keeping the artwork visible.
+                  Positioned(
+                    left: 0, right: 0, top: _d(1438,s), height: _d(162,s),
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                            colors: [const Color(0x22FFF7E5), const Color(0x55FFF7E5), const Color(0x33FFF7E5)],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   Positioned(
                     left:_d(28,s),
                     right:_d(28,s),
