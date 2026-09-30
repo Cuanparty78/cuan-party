@@ -4645,35 +4645,44 @@ class _PVStatsText extends StatelessWidget {
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(3, (i) => Expanded(
-        child: Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
+      children: List.generate(
+        3,
+        (i) => Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Align(
+              alignment: Alignment.center,
+              child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   values[i],
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF5A2F0A),
                     fontSize: 20,
+                    height: 1.0,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   labels[i],
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF5A2F0A),
                     fontSize: 10.5,
+                    height: 1.15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ),
-      )),
+      ),
     );
   }
 }
