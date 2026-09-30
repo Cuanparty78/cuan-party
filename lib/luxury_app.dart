@@ -4380,7 +4380,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
     final title = _selectedTab == 0 ? 'CP / Couple' : _selectedTab == 1 ? 'Koleksi Frame' : 'Gift';
     final icon = _selectedTab == 0 ? Icons.favorite_rounded : _selectedTab == 1 ? Icons.image_rounded : Icons.card_giftcard_rounded;
     final empty = _selectedTab == 0 ? 'Belum ada pasangan atau Family' : _selectedTab == 1 ? 'Belum ada frame' : 'Belum menerima gift';
-    return Padding(
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFF1B0E08),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
       child: Column(children: [
         _PVContentCard(title: title, icon: icon, child: _PVEmptyLine(text: empty)),
@@ -4407,7 +4409,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
         final effectivePhotos = photos.isNotEmpty ? photos.take(5).toList() : (primary.startsWith('http') ? <String>[primary] : <String>[]);
 
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: const Color(0xFF1B0E08),
           body: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Column(children: [
@@ -4465,14 +4467,28 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                   ),
 
                   Positioned(left:_d(58,s),right:_d(58,s),top:_d(990,s),height:_d(83,s),child:Row(children:[Expanded(child:_PVLevelText(title:'WEALTH',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'CHARM',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'GAME',level:level))])),
-                  Positioned(left:_d(58,s),right:_d(58,s),top:_d(1070,s),height:_d(84,s),child:const _PVStatsText(followers:0,following:0,visitors:0)),
+                  Positioned(
+                    left:_d(58,s),
+                    right:_d(58,s),
+                    top:_d(1058,s),
+                    height:_d(76,s),
+                    child:const _PVStatsText(followers:0,following:0,visitors:0),
+                  ),
                   Positioned(left:_d(58,s),right:_d(58,s),top:_d(1165,s),height:_d(225,s),child:GridView.builder(physics:const NeverScrollableScrollPhysics(),itemCount:10,padding:EdgeInsets.zero,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5,mainAxisSpacing:7,crossAxisSpacing:12,childAspectRatio:1),itemBuilder:(_,i)=>GestureDetector(behavior:HitTestBehavior.opaque,onTap:()=>_showMessage(context,'Badge ${i+1}'),child:const _PVBadgeSlot(url:'')))),
                   Positioned(left:_d(174,s),right:_d(174,s),top:_d(1398,s),height:_d(48,s),child:GestureDetector(behavior:HitTestBehavior.opaque,onTap:()=>_showMessage(context,'Semua badge'),child:Center(child:Text('Lihat semua  >',style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:13*s,fontWeight:FontWeight.w900))))),
-                  Positioned(left:0,right:0,top:_d(1450,s),height:_d(105,s),child:Row(children:[
-                    Expanded(child:_PVBottomTab(label:'RELATIONSHIPS',selected:_selectedTab==0,onTap:()=>setState(()=>_selectedTab=0))),
-                    Expanded(child:_PVBottomTab(label:'FRAME',selected:_selectedTab==1,onTap:()=>setState(()=>_selectedTab=1))),
-                    Expanded(child:_PVBottomTab(label:'GIFT',selected:_selectedTab==2,onTap:()=>setState(()=>_selectedTab=2))),
-                  ])),
+                  Positioned(
+                    left:_d(28,s),
+                    right:_d(28,s),
+                    top:_d(1458,s),
+                    height:_d(78,s),
+                    child:Row(
+                      children:[
+                        Expanded(child:_PVBottomTab(label:'RELATIONSHIPS',selected:_selectedTab==0,onTap:()=>setState(()=>_selectedTab=0))),
+                        Expanded(child:_PVBottomTab(label:'FRAME',selected:_selectedTab==1,onTap:()=>setState(()=>_selectedTab=1))),
+                        Expanded(child:_PVBottomTab(label:'GIFT',selected:_selectedTab==2,onTap:()=>setState(()=>_selectedTab=2))),
+                      ],
+                    ),
+                  ),
                 ]),
               ),
               _content(context),
@@ -4626,16 +4642,35 @@ class _PVStatsText extends StatelessWidget {
   Widget build(BuildContext context) {
     final values = [_fmt(followers), _fmt(following), _fmt(visitors)];
     final labels = ['Pengikut', 'Mengikuti', 'Visitors'];
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: List.generate(3, (i) => Expanded(
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(values[i], style: const TextStyle(color: Color(0xFF5A2F0A), fontSize: 23, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 4),
-              Text(labels[i], style: const TextStyle(color: Color(0xFF5A2F0A), fontSize: 11.5, fontWeight: FontWeight.w800)),
-            ],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  values[i],
+                  style: const TextStyle(
+                    color: Color(0xFF5A2F0A),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  labels[i],
+                  style: const TextStyle(
+                    color: Color(0xFF5A2F0A),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       )),
@@ -4684,8 +4719,43 @@ class _PVBottomTab extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   const _PVBottomTab({required this.label,required this.selected,required this.onTap});
+
   @override
-  Widget build(BuildContext context)=>GestureDetector(behavior:HitTestBehavior.opaque,onTap:onTap,child:Center(child:FittedBox(child:Text(label,style:TextStyle(color:selected?const Color(0xFFFFD76A):const Color(0xFFFFF3CF),fontSize:12.5,fontWeight:FontWeight.w900,letterSpacing:.3)))));
+  Widget build(BuildContext context) {
+    final icon = label == 'RELATIONSHIPS'
+        ? Icons.people_alt_rounded
+        : label == 'FRAME'
+            ? Icons.image_rounded
+            : Icons.card_giftcard_rounded;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: selected ? const Color(0xFFFFD76A) : const Color(0xFFFFEBC0), size: 21),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? const Color(0xFFFFD76A) : const Color(0xFFFFF3CF),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _EmptyRow extends StatelessWidget {
