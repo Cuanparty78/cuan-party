@@ -4479,39 +4479,48 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                         ),
                       ),
                     ),
-                    Positioned(
-                      left: (MediaQuery.sizeOf(context).width - avatarSize) / 2,
-                      bottom: -avatarSize * .48,
-                      width: avatarSize,
-                      height: avatarSize,
-                      child: _PVCleanAvatar(
-                        photoUrl: effectivePhotos.isNotEmpty
-                            ? effectivePhotos.first
-                            : '',
-                        fallbackLetter:
-                            name.isEmpty ? 'C' : name[0].toUpperCase(),
-                        scale: scale,
-                        onTap: () {
-                          if (effectivePhotos.isNotEmpty) {
-                            _openPhotos(context, effectivePhotos, 0);
-                          } else {
-                            _showMessage(context, 'Ganti foto profil');
-                          }
-                        },
-                      ),
-                    ),
                   ],
                 ),
                 _PVCleanBodyBackground(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       horizontal,
-                      avatarSize * .58,
+                      0,
                       horizontal,
                       _d(42, scale),
                     ),
                     child: Column(
                       children: [
+                        // Keep the avatar inside the body layer so it paints ABOVE
+                        // the cream section while still overlapping the photo area.
+                        SizedBox(
+                          height: avatarSize * .56,
+                          child: Transform.translate(
+                            offset: Offset(0, -avatarSize * .48),
+                            child: Center(
+                              child: SizedBox(
+                                width: avatarSize,
+                                height: avatarSize,
+                                child: _PVCleanAvatar(
+                                  photoUrl: effectivePhotos.isNotEmpty
+                                      ? effectivePhotos.first
+                                      : '',
+                                  fallbackLetter:
+                                      name.isEmpty ? 'C' : name[0].toUpperCase(),
+                                  scale: scale,
+                                  onTap: () {
+                                    if (effectivePhotos.isNotEmpty) {
+                                      _openPhotos(context, effectivePhotos, 0);
+                                    } else {
+                                      _showMessage(context, 'Ganti foto profil');
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: _d(8, scale)),
                         Text(
                           name,
                           maxLines: 1,
@@ -4726,7 +4735,7 @@ class _PVCleanBodyBackground extends StatelessWidget {
             top: 0,
             left: 0,
             right: 0,
-            height: 2,
+            height: 1.5,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -5209,13 +5218,13 @@ class _PVCleanLevelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 92 * scale,
+      height: 88 * scale,
       child: Container(
         padding: EdgeInsets.fromLTRB(
-          8 * scale,
-          7 * scale,
           10 * scale,
-          7 * scale,
+          8 * scale,
+          10 * scale,
+          8 * scale,
         ),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -5241,7 +5250,7 @@ class _PVCleanLevelCard extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, box) {
-            final crestSize = box.maxHeight * .92;
+            final crestSize = math.min(box.maxHeight * .66, box.maxWidth * .34);
             return Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -5255,7 +5264,7 @@ class _PVCleanLevelCard extends StatelessWidget {
                     gaplessPlayback: true,
                   ),
                 ),
-                SizedBox(width: 4 * scale),
+                SizedBox(width: 6 * scale),
                 Flexible(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -5264,7 +5273,7 @@ class _PVCleanLevelCard extends StatelessWidget {
                       maxLines: 1,
                       style: TextStyle(
                         color: const Color(0xFF5B3214),
-                        fontSize: 22 * scale,
+                        fontSize: 21 * scale,
                         height: 1,
                         fontWeight: FontWeight.w900,
                       ),
@@ -5299,7 +5308,7 @@ class _PVCleanStatsBar extends StatelessWidget {
     const labels = <String>['Pengikut', 'Mengikuti', 'Visitors'];
 
     return Container(
-      height: 92 * scale,
+      height: 88 * scale,
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E9),
         borderRadius: BorderRadius.circular(22 * scale),
@@ -5517,7 +5526,7 @@ class _PVCleanSectionCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                      SizedBox(width: 4 * scale),
+                      SizedBox(width: 6 * scale),
                       Icon(
                         Icons.chevron_right_rounded,
                         color: const Color(0xFF9B691D),
@@ -5947,8 +5956,8 @@ class _PVLevelText extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) {
         // Size from the real 1/3 level slot, never from fixed screen pixels.
-        final crest = box.maxHeight * .72;
-        final font = box.maxHeight * .27;
+        final crest = math.min(box.maxHeight * .58, box.maxWidth * .26);
+        final font = box.maxHeight * .24;
         final gap = box.maxWidth * .025;
         return Center(
           child: Row(
