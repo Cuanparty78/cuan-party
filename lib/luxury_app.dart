@@ -4445,7 +4445,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
 
                   // Exact center of the transparent avatar hole in the 702x1600 artwork.
                   Positioned(
-                    left: _d(226,s), top: _d(585,s), width: _d(250,s), height: _d(250,s),
+                    left: _d(246,s), top: _d(605,s), width: _d(210,s), height: _d(210,s),
                     child: GestureDetector(
                       onTap: () => effectivePhotos.isNotEmpty ? _openPhotos(context,effectivePhotos,0) : _showMessage(context,'Ganti foto profil'),
                       child: ClipOval(
@@ -4456,9 +4456,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                     ),
                   ),
 
-                  Positioned(left:_d(135,s),right:_d(135,s),top:_d(862,s),height:_d(62,s),child: Center(child: Text(name,maxLines:1,overflow:TextOverflow.ellipsis,textAlign:TextAlign.center,style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:22*s,fontWeight:FontWeight.w900)))),
+                  Positioned(left:_d(135,s),right:_d(135,s),top:_d(858,s),height:_d(58,s),child: Center(child: Text(name,maxLines:1,overflow:TextOverflow.ellipsis,textAlign:TextAlign.center,style:TextStyle(color:const Color(0xFF5A2F0A),fontSize:22*s,fontWeight:FontWeight.w900)))),
                   Positioned(
-                    left:_d(105,s),right:_d(105,s),top:_d(925,s),height:_d(72,s),
+                    left:_d(105,s),right:_d(105,s),top:_d(914,s),height:_d(78,s),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children:[
@@ -4499,12 +4499,12 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                   ),
 
 
-                  Positioned(left:_d(58,s),right:_d(58,s),top:_d(990,s),height:_d(78,s),child:Row(children:[Expanded(child:_PVLevelText(title:'WEALTH',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'CHARM',level:level)),SizedBox(width:_d(8,s)),Expanded(child:_PVLevelText(title:'GAME',level:level))])),
+                  Positioned(left:_d(48,s),right:_d(48,s),top:_d(992,s),height:_d(70,s),child:Row(children:[Expanded(child:_PVLevelText(title:'WEALTH',level:level)),Expanded(child:_PVLevelText(title:'CHARM',level:level)),Expanded(child:_PVLevelText(title:'GAME',level:level))])),
                   Positioned(
-                    left:_d(58,s),
-                    right:_d(58,s),
-                    top:_d(1058,s),
-                    height:_d(76,s),
+                    left:_d(48,s),
+                    right:_d(48,s),
+                    top:_d(1062,s),
+                    height:_d(72,s),
                     child:const _PVStatsText(followers:0,following:0,visitors:0),
                   ),
                   Positioned(left:_d(58,s),right:_d(58,s),top:_d(1165,s),height:_d(225,s),child:GridView.builder(physics:const NeverScrollableScrollPhysics(),itemCount:10,padding:EdgeInsets.zero,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5,mainAxisSpacing:7,crossAxisSpacing:12,childAspectRatio:1),itemBuilder:(_,i)=>GestureDetector(behavior:HitTestBehavior.opaque,onTap:()=>_showMessage(context,'Badge ${i+1}'),child:const _PVBadgeSlot(url:'')))),
@@ -4517,7 +4517,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                            colors: [const Color(0x22FFF7E5), const Color(0x55FFF7E5), const Color(0x33FFF7E5)],
+                            colors: [const Color(0x55FFF7E5), const Color(0x88FFF7E5), const Color(0x66FFF7E5)],
                           ),
                         ),
                       ),
@@ -4669,35 +4669,51 @@ class _PVLevelText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = _crestBase64[title]!;
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 56,
-            height: 62,
-            child: Image(
-              image: MemoryImage(base64Decode(data)),
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Size from the real 1/3 level slot, never from fixed screen pixels.
+        final crest = box.maxHeight * .72;
+        final font = box.maxHeight * .27;
+        final gap = box.maxWidth * .025;
+        return Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: crest,
+                height: crest,
+                child: Image(
+                  image: MemoryImage(base64Decode(data)),
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+              SizedBox(width: gap),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'LV $level',
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: const Color(0xFF5A2F0A),
+                      fontSize: font,
+                      height: 1,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 4),
-          Text(
-            'LV $level',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF5A2F0A),
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              letterSpacing: .2,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
+
 }
 
 class _PVStatsText extends StatelessWidget {
@@ -4816,14 +4832,14 @@ class _PVBottomTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: selected ? const Color(0xFFFFD76A) : const Color(0xFFFFEBC0), size: 21),
+              Icon(icon, color: selected ? const Color(0xFF8A510B) : const Color(0xFF6A3A0A), size: 21),
               const SizedBox(height: 3),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? const Color(0xFFFFD76A) : const Color(0xFFFFF3CF),
+                  color: selected ? const Color(0xFF8A510B) : const Color(0xFF6A3A0A),
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                   letterSpacing: .15,
