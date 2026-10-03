@@ -4414,7 +4414,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                 : <String>[]);
 
         final heroH = _d(505, scale);
-        final avatarSize = _d(214, scale);
+        final avatarSize = _d(258, scale);
         final horizontal = _d(24, scale);
         final sectionGap = _d(14, scale);
 
@@ -4494,9 +4494,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                         // Keep the avatar inside the body layer so it paints ABOVE
                         // the cream section while still overlapping the photo area.
                         SizedBox(
-                          height: avatarSize * .56,
+                          height: avatarSize * .55,
                           child: Transform.translate(
-                            offset: Offset(0, -avatarSize * .49),
+                            offset: Offset(0, -avatarSize * .50),
                             child: Center(
                               child: SizedBox(
                                 width: avatarSize,
@@ -4520,7 +4520,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                             ),
                           ),
                         ),
-                        SizedBox(height: _d(2, scale)),
+                        SizedBox(height: _d(0, scale)),
                         Text(
                           name,
                           maxLines: 1,
