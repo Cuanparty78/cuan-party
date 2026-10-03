@@ -64,28 +64,33 @@ jobs:
 
           ls -lh android/app/cuanparty-release.jks
 
-      # Build APK dengan retry.
-      # Error sebelumnya adalah dependency Kotlin gagal di-download
-      # dengan HTTP 500, jadi retry akan mencoba lagi.
+      # Build APK dengan retry + ZEGO voice configuration
       - name: Build release APK
         env:
           KEYSTORE_FILE: app/cuanparty-release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+          ZEGO_APP_ID: ${{ secrets.ZEGO_APP_ID }}
+          ZEGO_APP_SIGN: ${{ secrets.ZEGO_APP_SIGN }}
+
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs=-Xmx4g
             -Dhttp.connectionTimeout=120000
             -Dhttp.socketTimeout=120000
             -Dhttps.connectionTimeout=120000
             -Dhttps.socketTimeout=120000
+
         run: |
           for attempt in 1 2 3; do
             echo "======================================"
             echo "=== APK BUILD ATTEMPT $attempt/3 ==="
             echo "======================================"
 
-            if flutter build apk --release; then
+            if flutter build apk --release \
+              --dart-define=ZEGO_APP_ID="$ZEGO_APP_ID" \
+              --dart-define=ZEGO_APP_SIGN="$ZEGO_APP_SIGN"; then
               echo "APK BUILD SUCCEEDED."
               exit 0
             fi
