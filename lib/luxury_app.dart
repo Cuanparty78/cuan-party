@@ -4974,6 +4974,10 @@ class _PVCleanAvatar extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Stack(
+        // IMPORTANT: force the avatar artwork to fill the 258px parent box.
+        // Without StackFit.expand, the circular Container keeps its intrinsic
+        // size, so changing avatarSize outside does not visibly enlarge it.
+        fit: StackFit.expand,
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
@@ -5023,10 +5027,10 @@ class _PVCleanAvatar extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: -10 * scale,
+            top: -9 * scale,
             child: Container(
-              width: 42 * scale,
-              height: 31 * scale,
+              width: 46 * scale,
+              height: 34 * scale,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: const Color(0xFFFFE7A0),
