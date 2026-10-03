@@ -4495,12 +4495,16 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                         // the cream section while still overlapping the photo area.
                         SizedBox(
                           height: avatarSize * .55,
-                          child: Transform.translate(
-                            offset: Offset(0, -avatarSize * .50),
-                            child: Center(
-                              child: SizedBox(
-                                width: avatarSize,
-                                height: avatarSize,
+                          child: OverflowBox(
+                            alignment: Alignment.topCenter,
+                            minWidth: avatarSize,
+                            maxWidth: avatarSize,
+                            minHeight: avatarSize,
+                            maxHeight: avatarSize,
+                            child: Transform.translate(
+                              offset: Offset(0, -avatarSize * .50),
+                              child: SizedBox.square(
+                                dimension: avatarSize,
                                 child: _PVCleanAvatar(
                                   photoUrl: effectivePhotos.isNotEmpty
                                       ? effectivePhotos.first
