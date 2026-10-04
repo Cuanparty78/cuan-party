@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.example.cuan_party"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
