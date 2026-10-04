@@ -290,6 +290,9 @@ class _RoomRealtimeService {
             : (user.photoURL ?? ''),
         'cuanId': AppProfileState.cuanId.value,
         'country': AppProfileState.country.value,
+        'gender': AppProfileState.gender.value,
+        'level': AppProfileState.level.value,
+        'vip': AppProfileState.vip.value,
         'lastSeen': FieldValue.serverTimestamp(),
       };
 
@@ -323,6 +326,8 @@ class _RoomRealtimeService {
       'password': isPrivate ? password : '',
       'isActive': true,
       'roomCode': roomCode,
+      'coverUrl': AppProfileState.photoUrl.value.trim(),
+      'chatEnabled': true,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'lastActivityAt': FieldValue.serverTimestamp(),
@@ -560,6 +565,97 @@ class _RoomRealtimeService {
       'lastActivityAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();
+  }
+
+  static Future<void> updateRoomDetails(
+    String roomId, {
+    String? name,
+    String? announcement,
+    bool? isPrivate,
+    String? password,
+    String? coverUrl,
+    bool? chatEnabled,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    final snap = await ref.get();
+    if ('${snap.data()?['ownerId'] ?? ''}' != user.uid) {
+      throw StateError('OWNER_ONLY');
+    }
+
+    final data = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastActivityAt': FieldValue.serverTimestamp(),
+    };
+    if (name != null) {
+      data['name'] = name.trim();
+      data['roomName'] = name.trim();
+    }
+    if (announcement != null) data['announcement'] = announcement.trim();
+    if (isPrivate != null) data['isPrivate'] = isPrivate;
+    if (password != null) data['password'] = isPrivate == false ? '' : password.trim();
+    if (coverUrl != null) data['coverUrl'] = coverUrl.trim();
+    if (chatEnabled != null) data['chatEnabled'] = chatEnabled;
+    await ref.update(data);
+  }
+
+  static Future<void> setMemberRole(
+    String roomId,
+    String uid,
+    String role,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    final snap = await ref.get();
+    if ('${snap.data()?['ownerId'] ?? ''}' != user.uid) {
+      throw StateError('OWNER_ONLY');
+    }
+    if (uid == user.uid) throw StateError('OWNER_ROLE_LOCKED');
+    await ref.collection('members').doc(uid).set(
+      <String, dynamic>{
+        'role': role,
+        'lastSeen': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  static Future<void> kickMember(String roomId, String uid) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    final memberRef = ref.collection('members').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(ref);
+      if (!roomSnap.exists) throw StateError('ROOM_NOT_FOUND');
+      final roomData = roomSnap.data() ?? const <String, dynamic>{};
+      if ('${roomData['ownerId'] ?? ''}' != user.uid) {
+        throw StateError('OWNER_ONLY');
+      }
+      if (uid == user.uid) throw StateError('OWNER_CANNOT_KICK_SELF');
+
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) return;
+      final memberData = memberSnap.data() ?? const <String, dynamic>{};
+      final seatIndex = memberData['seatIndex'];
+      if (seatIndex is num) {
+        tx.delete(ref.collection('seats').doc('${seatIndex.toInt()}'));
+      }
+      tx.delete(memberRef);
+
+      final current = roomData['memberCount'] is num
+          ? (roomData['memberCount'] as num).toInt()
+          : 1;
+      tx.update(ref, <String, dynamic>{
+        'memberCount': math.max(0, current - 1),
+        'memberIds': FieldValue.arrayRemove(<String>[uid]),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'lastActivityAt': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   static Future<void> sendChat(String roomId, String text) async {
@@ -2217,11 +2313,37 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   String _ownerId = '';
   String _roomCode = '';
   String _announcement = '';
+  String _coverUrl = '';
+  String _roomPassword = '';
+  bool _roomPrivate = false;
+  bool _chatEnabled = true;
+
+  // Room visual & sound preferences.
+  // These are client-side preferences for the current room session.
+  bool _winAnimationEnabled = true;
+  bool _giftVisualEnabled = true;
+  bool _vehicleVisualEnabled = true;
+  bool _rocketAnimationEnabled = true;
+  bool _emojiCommentsEnabled = true;
+  bool _globalNoticeEnabled = true;
+  bool _giftChannelEnabled = true;
+  bool _entranceVisualEnabled = true;
+
+  bool _roomSoundEffectsEnabled = true;
+  bool _giftSoundEnabled = true;
+  bool _gameSoundEnabled = true;
+  bool _musicSoundEnabled = true;
+  bool _micEffectSoundEnabled = true;
+  bool _entranceSoundEnabled = true;
+
   String _feedFilter = 'all';
   String _giftTarget = 'Saya';
   late List<String?> _seatNames;
   late List<GlobalKey> _seatKeys;
   final Map<int, bool> _seatMicStates = <int, bool>{};
+  final Map<int, String> _seatUids = <int, String>{};
+  final Map<String, Map<String, dynamic>> _roomMembers =
+      <String, Map<String, dynamic>>{};
   final GlobalKey _roomStackKey = GlobalKey();
   final List<_GiftFlight> _giftFlights = [];
   final Map<int, String> _seatEmojis = {};
@@ -2312,7 +2434,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _zegoJoined = false);
-      _showMessage(context, 'Audio ZEGO gagal tersambung.');
+      _showMessage(context, 'Audio ZEGO gagal: $e');
       debugPrint('ZEGO join error: $e');
     }
   }
@@ -2348,6 +2470,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         _ownerId = '${data['ownerId'] ?? ''}';
         _roomCode = '${data['roomCode'] ?? ''}';
         _announcement = '${data['announcement'] ?? ''}';
+        _coverUrl = '${data['coverUrl'] ?? ''}'.trim();
+        _roomPassword = '${data['password'] ?? ''}';
+        _roomPrivate = data['isPrivate'] == true;
+        _chatEnabled = data['chatEnabled'] != false;
         _memberCount = data['memberCount'] is num ? (data['memberCount'] as num).toInt() : _memberCount;
         if (nextCapacity != _capacity && [10, 15, 20, 30].contains(nextCapacity)) {
           _capacity = nextCapacity;
@@ -2369,6 +2495,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       if (!mounted) return;
       final names = _makeSeats(_capacity);
       final micStates = <int, bool>{};
+      final seatUids = <int, String>{};
       final myUid = FirebaseAuth.instance.currentUser?.uid;
       for (final doc in snapshot.docs) {
         final index = int.tryParse(doc.id);
@@ -2378,12 +2505,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         final name = '${data['name'] ?? 'User'}';
         names[index] = uid == myUid ? 'Saya' : name;
         micStates[index] = data['micOn'] == true;
+        if (uid.isNotEmpty) seatUids[index] = uid;
       }
       setState(() {
         _seatNames = names;
         _seatMicStates
           ..clear()
           ..addAll(micStates);
+        _seatUids
+          ..clear()
+          ..addAll(seatUids);
       });
     });
 
@@ -2398,8 +2529,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       int? mySeat;
       var myMic = false;
       var foundMe = false;
+      final members = <String, Map<String, dynamic>>{};
       for (final doc in snapshot.docs) {
         final data = doc.data();
+        members[doc.id] = <String, dynamic>{
+          ...data,
+          'uid': doc.id,
+        };
         final seen = data['lastSeen'];
         final recent = seen is! Timestamp || now.difference(seen.toDate()).inSeconds <= 90;
         if (recent) active++;
@@ -2415,6 +2551,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         _mySeatIndex = mySeat;
         _micOn = myMic;
         _joined = foundMe;
+        _roomMembers
+          ..clear()
+          ..addAll(members);
       });
     });
 
@@ -2591,6 +2730,14 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   void _showRoomEmojiPicker() {
+    if (!_emojiCommentsEnabled) {
+      _showMessage(
+        context,
+        'Komentar emoji sedang dimatikan di Pengaturan Efek & Suara.',
+      );
+      return;
+    }
+
     const emojis = ['😀','😂','😍','🥰','😘','😎','🔥','❤️','💜','👏','🎉','🤣','😭','😱','👍','🙏','✨','💎','👑','✈️'];
     showModalBottomSheet(
       context: context,
@@ -2631,6 +2778,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   Future<void> _sendMessage() async {
     final value = _messageController.text.trim();
     if (value.isEmpty) return;
+    if (!_chatEnabled && !_isOwner) {
+      _showMessage(context, 'Obrolan sedang ditutup oleh owner.');
+      return;
+    }
     _messageController.clear();
     if (_isRealtime) {
       try {
@@ -2796,7 +2947,1402 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
 
+  Future<void> _handleSeatTap(int index) async {
+    final uid = _seatUids[index];
+    if (uid != null && uid.isNotEmpty) {
+      final data = _roomMembers[uid] ??
+          <String, dynamic>{
+            'uid': uid,
+            'name': _seatNames[index] ?? 'User',
+            'seatIndex': index,
+            'micOn': _seatMicStates[index] == true,
+          };
+      _showMiniProfile(data);
+      return;
+    }
+    await _takeSeat(index);
+  }
+
+  Widget _roomToolTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool highlighted = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 92,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        decoration: BoxDecoration(
+          color: highlighted
+              ? _roomGold.withOpacity(.16)
+              : Colors.white.withOpacity(.06),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: highlighted
+                ? _roomGold.withOpacity(.55)
+                : Colors.white.withOpacity(.08),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black.withOpacity(.24),
+              ),
+              child: Icon(icon, color: _roomGold, size: 25),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _effectSettingTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _C.surface2,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _C.line),
+      ),
+      child: SwitchListTile.adaptive(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 3,
+        ),
+        secondary: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: _C.gold2.withOpacity(.45),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: _C.brown,
+            size: 21,
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: _C.text,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        subtitle: subtitle == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: _C.muted,
+                    fontSize: 11,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+        value: value,
+        activeColor: _C.gold,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  void _showEffectAndSoundSettings() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _C.surface,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(28),
+        ),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          void update(VoidCallback callback) {
+            setState(callback);
+            setSheetState(() {});
+          }
+
+          return SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .84,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 10, 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: _C.gold2,
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: _C.brown,
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Efek Visual & Suara',
+                              style: TextStyle(
+                                color: _C.text,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Atur efek yang ingin kamu lihat dan dengar di room.',
+                              style: TextStyle(
+                                color: _C.muted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+                    children: [
+                      const Text(
+                        'PENGATURAN EFEK VISUAL',
+                        style: TextStyle(
+                          color: _C.brown2,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .7,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _effectSettingTile(
+                        icon: Icons.emoji_events_rounded,
+                        title: 'Animasi Kemenangan',
+                        subtitle:
+                            'Tampilkan animasi kemenangan dari game atau event room.',
+                        value: _winAnimationEnabled,
+                        onChanged: (value) => update(
+                          () => _winAnimationEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.card_giftcard_rounded,
+                        title: 'Efek Visual Hadiah',
+                        subtitle:
+                            'Tampilkan animasi hadiah yang dikirim di room.',
+                        value: _giftVisualEnabled,
+                        onChanged: (value) => update(
+                          () => _giftVisualEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.directions_car_filled_rounded,
+                        title: 'Efek Visual Kendaraan',
+                        subtitle:
+                            'Tampilkan efek kendaraan/entrance spesial.',
+                        value: _vehicleVisualEnabled,
+                        onChanged: (value) => update(
+                          () => _vehicleVisualEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.rocket_launch_rounded,
+                        title: 'Animasi Ledakan Roket',
+                        value: _rocketAnimationEnabled,
+                        onChanged: (value) => update(
+                          () => _rocketAnimationEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.emoji_emotions_rounded,
+                        title: 'Komentar Emoji',
+                        subtitle:
+                            'Izinkan emoji tampil sementara di area seat.',
+                        value: _emojiCommentsEnabled,
+                        onChanged: (value) => update(
+                          () => _emojiCommentsEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.public_rounded,
+                        title: 'Pemberitahuan Global',
+                        subtitle:
+                            'Tampilkan pengumuman global/event besar.',
+                        value: _globalNoticeEnabled,
+                        onChanged: (value) => update(
+                          () => _globalNoticeEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.redeem_rounded,
+                        title: 'Kanal Pemberian Hadiah',
+                        subtitle:
+                            'Tampilkan aktivitas hadiah di feed room.',
+                        value: _giftChannelEnabled,
+                        onChanged: (value) => update(
+                          () => _giftChannelEnabled = value,
+                        ),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.login_rounded,
+                        title: 'Animasi Masuk Room',
+                        subtitle:
+                            'Tampilkan efek entrance user saat masuk room.',
+                        value: _entranceVisualEnabled,
+                        onChanged: (value) => update(
+                          () => _entranceVisualEnabled = value,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'PENGATURAN EFEK SUARA',
+                        style: TextStyle(
+                          color: _C.brown2,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .7,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _effectSettingTile(
+                        icon: Icons.graphic_eq_rounded,
+                        title: 'Efek Suara Room',
+                        subtitle:
+                            'Master switch untuk suara efek selain suara user.',
+                        value: _roomSoundEffectsEnabled,
+                        onChanged: (value) => update(() {
+                          _roomSoundEffectsEnabled = value;
+                          if (!value) {
+                            _giftSoundEnabled = false;
+                            _gameSoundEnabled = false;
+                            _musicSoundEnabled = false;
+                            _micEffectSoundEnabled = false;
+                            _entranceSoundEnabled = false;
+                          }
+                        }),
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.notifications_active_rounded,
+                        title: 'Suara Gift',
+                        value: _giftSoundEnabled,
+                        onChanged: _roomSoundEffectsEnabled
+                            ? (value) => update(
+                                  () => _giftSoundEnabled = value,
+                                )
+                            : (_) {},
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.sports_esports_rounded,
+                        title: 'Suara Game',
+                        value: _gameSoundEnabled,
+                        onChanged: _roomSoundEffectsEnabled
+                            ? (value) => update(
+                                  () => _gameSoundEnabled = value,
+                                )
+                            : (_) {},
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.music_note_rounded,
+                        title: 'Musik Room',
+                        subtitle:
+                            'Kontrol suara musik/background room saat fitur musik aktif.',
+                        value: _musicSoundEnabled,
+                        onChanged: _roomSoundEffectsEnabled
+                            ? (value) => update(
+                                  () => _musicSoundEnabled = value,
+                                )
+                            : (_) {},
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.mic_external_on_rounded,
+                        title: 'Efek Suara Mikrofon',
+                        subtitle:
+                            'Kontrol efek mic seperti reverb/voice effect.',
+                        value: _micEffectSoundEnabled,
+                        onChanged: _roomSoundEffectsEnabled
+                            ? (value) => update(
+                                  () => _micEffectSoundEnabled = value,
+                                )
+                            : (_) {},
+                      ),
+                      _effectSettingTile(
+                        icon: Icons.meeting_room_rounded,
+                        title: 'Suara Masuk Room',
+                        value: _entranceSoundEnabled,
+                        onChanged: _roomSoundEffectsEnabled
+                            ? (value) => update(
+                                  () => _entranceSoundEnabled = value,
+                                )
+                            : (_) {},
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _C.gold2.withOpacity(.28),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              color: _C.brown,
+                              size: 18,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Pengaturan ini hanya mematikan efek visual/suara tambahan. Suara orang di voice room tetap dikontrol dari tombol speaker.',
+                                style: TextStyle(
+                                  color: _C.brown,
+                                  fontSize: 11,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showRoomTools() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+          decoration: BoxDecoration(
+            color: const Color(0xF21A1822),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: Colors.white.withOpacity(.08)),
+            boxShadow: const [
+              BoxShadow(color: Colors.black54, blurRadius: 24),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Alat Room',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    if (_isOwner)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _roomGold.withOpacity(.16),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'OWNER',
+                          style: TextStyle(
+                            color: _roomGold,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    if (_isOwner)
+                      _roomToolTile(
+                        icon: Icons.edit_rounded,
+                        label: 'Edit Room',
+                        highlighted: true,
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          _showRoomEditor();
+                        },
+                      ),
+                    _roomToolTile(
+                      icon: _roomPrivate
+                          ? Icons.lock_rounded
+                          : Icons.lock_open_rounded,
+                      label: _roomPrivate ? 'Room Terkunci' : 'Room Publik',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        if (_isOwner) {
+                          _showRoomEditor();
+                        } else {
+                          _showMessage(
+                            context,
+                            _roomPrivate
+                                ? 'Room ini menggunakan akses private.'
+                                : 'Room ini terbuka untuk semua user.',
+                          );
+                        }
+                      },
+                    ),
+                    _roomToolTile(
+                      icon: _chatEnabled
+                          ? Icons.chat_bubble_outline_rounded
+                          : Icons.comments_disabled_rounded,
+                      label: _chatEnabled ? 'Obrolan Buka' : 'Obrolan Tutup',
+                      onTap: () async {
+                        if (!_isOwner || !_isRealtime) {
+                          Navigator.pop(sheetContext);
+                          _showMessage(
+                            context,
+                            _chatEnabled
+                                ? 'Obrolan room sedang aktif.'
+                                : 'Obrolan room sedang ditutup.',
+                          );
+                          return;
+                        }
+                        try {
+                          await _RoomRealtimeService.updateRoomDetails(
+                            widget.roomId!,
+                            chatEnabled: !_chatEnabled,
+                          );
+                          if (sheetContext.mounted) {
+                            Navigator.pop(sheetContext);
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            _showMessage(
+                              context,
+                              'Status obrolan gagal diperbarui.',
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    _roomToolTile(
+                      icon: Icons.music_note_rounded,
+                      label: 'Music',
+                      onTap: () => _showMessage(
+                        context,
+                        'Music room akan dihubungkan ke pemutar audio.',
+                      ),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.graphic_eq_rounded,
+                      label: 'Efek & Suara',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showEffectAndSoundSettings();
+                      },
+                    ),
+                    _roomToolTile(
+                      icon: Icons.mic_external_on_rounded,
+                      label: 'Mode Mikrofon',
+                      onTap: () => _showMessage(
+                        context,
+                        'Mode mikrofon mengikuti seat dan status mic user.',
+                      ),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.palette_outlined,
+                      label: 'Tema',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        if (_isOwner) {
+                          _showRoomEditor();
+                        } else {
+                          _showMessage(context, 'Tema room diatur oleh owner.');
+                        }
+                      },
+                    ),
+                    _roomToolTile(
+                      icon: Icons.people_alt_rounded,
+                      label: 'Daftar Online',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showOnlineMembers();
+                      },
+                    ),
+                    _roomToolTile(
+                      icon: Icons.ios_share_rounded,
+                      label: 'Bagikan',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showMessage(
+                          context,
+                          'ID Room ${_roomCode.isEmpty ? widget.roomId ?? '' : _roomCode} siap dibagikan.',
+                        );
+                      },
+                    ),
+                    _roomToolTile(
+                      icon: Icons.report_gmailerrorred_rounded,
+                      label: 'Lapor',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showMessage(context, 'Laporan room dibuka.');
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRoomExtras() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+          decoration: BoxDecoration(
+            color: const Color(0xF21A1822),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: Colors.white.withOpacity(.08)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Permainan Interaktif',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Game dan fitur room dibuka dari satu menu.',
+                  style: TextStyle(color: Colors.white.withOpacity(.62)),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _roomToolTile(
+                      icon: Icons.extension_rounded,
+                      label: 'Monster Crush',
+                      highlighted: true,
+                      onTap: () => _showMessage(
+                        context,
+                        'Monster Crush siap ditempatkan di menu ini saat SDK game terhubung.',
+                      ),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.casino_rounded,
+                      label: 'Ludo',
+                      onTap: () => _showMessage(context, 'Ludo belum terhubung.'),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.style_rounded,
+                      label: 'UNO',
+                      onTap: () => _showMessage(context, 'UNO belum terhubung.'),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.sports_esports_rounded,
+                      label: 'Carrom',
+                      onTap: () => _showMessage(context, 'Carrom belum terhubung.'),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.leaderboard_rounded,
+                      label: 'Papan Score',
+                      onTap: () => _showMessage(context, 'Papan score dibuka.'),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.card_giftcard_rounded,
+                      label: 'Lucky Bag',
+                      onTap: _showGifts,
+                    ),
+                    _roomToolTile(
+                      icon: Icons.calendar_month_rounded,
+                      label: 'Tugas Harian',
+                      onTap: () => _showMessage(context, 'Tugas harian room.'),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.family_restroom_rounded,
+                      label: 'Family Call',
+                      onTap: () => _showMessage(context, 'Family Call belum diaktifkan.'),
+                    ),
+                    _roomToolTile(
+                      icon: Icons.emoji_emotions_rounded,
+                      label: 'Emoji',
+                      onTap: _showRoomEmojiPicker,
+                    ),
+                    _roomToolTile(
+                      icon: Icons.tune_rounded,
+                      label: 'Efek & Suara',
+                      highlighted: true,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showEffectAndSoundSettings();
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRoomEditor() {
+    if (!_isOwner || !_isRealtime) {
+      _showMessage(context, 'Hanya owner yang bisa mengedit room.');
+      return;
+    }
+
+    final nameController = TextEditingController(text: _roomName);
+    final announcementController =
+        TextEditingController(text: _announcement);
+    final passwordController =
+        TextEditingController(text: _roomPassword);
+    var privateRoom = _roomPrivate;
+    var selectedCapacity = _capacity;
+    var coverUrl = _coverUrl;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _C.surface,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final profilePhoto = AppProfileState.photoUrl.value.trim();
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Edit Room',
+                    style: TextStyle(
+                      color: _C.text,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 34,
+                        backgroundColor: _C.gold2,
+                        backgroundImage:
+                            coverUrl.startsWith('http')
+                                ? NetworkImage(coverUrl)
+                                : null,
+                        child: coverUrl.startsWith('http')
+                            ? null
+                            : const Icon(
+                                Icons.home_rounded,
+                                color: _C.brown,
+                                size: 30,
+                              ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Cover Room',
+                              style: TextStyle(
+                                color: _C.text,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            Wrap(
+                              spacing: 7,
+                              children: [
+                                if (profilePhoto.startsWith('http'))
+                                  ActionChip(
+                                    avatar: const Icon(
+                                      Icons.person_rounded,
+                                      size: 17,
+                                    ),
+                                    label: const Text('Foto Profil'),
+                                    onPressed: () => setSheetState(
+                                      () => coverUrl = profilePhoto,
+                                    ),
+                                  ),
+                                ActionChip(
+                                  avatar: const Icon(
+                                    Icons.hide_image_rounded,
+                                    size: 17,
+                                  ),
+                                  label: const Text('Tanpa Foto'),
+                                  onPressed: () =>
+                                      setSheetState(() => coverUrl = ''),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameController,
+                    maxLength: 32,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Room',
+                      prefixIcon: Icon(Icons.mic_rounded),
+                    ),
+                  ),
+                  TextField(
+                    controller: announcementController,
+                    maxLength: 160,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Pengumuman Room',
+                      prefixIcon: Icon(Icons.campaign_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    value: selectedCapacity,
+                    decoration: const InputDecoration(
+                      labelText: 'Jumlah Seat',
+                      prefixIcon: Icon(Icons.event_seat_rounded),
+                    ),
+                    items: const [10, 15, 20, 30]
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text('$value Seat'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setSheetState(
+                      () => selectedCapacity = value ?? selectedCapacity,
+                    ),
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: privateRoom,
+                    title: const Text(
+                      'Private Room',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    subtitle: Text(
+                      privateRoom
+                          ? 'User masuk menggunakan password'
+                          : 'Room terbuka untuk semua user',
+                    ),
+                    onChanged: (value) =>
+                        setSheetState(() => privateRoom = value),
+                  ),
+                  if (privateRoom)
+                    TextField(
+                      controller: passwordController,
+                      obscureText: true,
+                      maxLength: 12,
+                      decoration: const InputDecoration(
+                        labelText: 'Password Room',
+                        prefixIcon: Icon(Icons.lock_rounded),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.save_rounded),
+                      label: const Text('Simpan Perubahan'),
+                      onPressed: () async {
+                        final newName = nameController.text.trim();
+                        if (newName.length < 2) {
+                          _showMessage(
+                            context,
+                            'Nama room minimal 2 karakter.',
+                          );
+                          return;
+                        }
+                        if (privateRoom &&
+                            passwordController.text.trim().length < 4) {
+                          _showMessage(
+                            context,
+                            'Password private room minimal 4 karakter.',
+                          );
+                          return;
+                        }
+                        try {
+                          if (selectedCapacity != _capacity) {
+                            await _RoomRealtimeService.changeCapacity(
+                              widget.roomId!,
+                              selectedCapacity,
+                            );
+                          }
+                          await _RoomRealtimeService.updateRoomDetails(
+                            widget.roomId!,
+                            name: newName,
+                            announcement:
+                                announcementController.text.trim(),
+                            isPrivate: privateRoom,
+                            password: privateRoom
+                                ? passwordController.text.trim()
+                                : '',
+                            coverUrl: coverUrl,
+                          );
+                          if (sheetContext.mounted) {
+                            Navigator.pop(sheetContext);
+                          }
+                          if (mounted) {
+                            _showMessage(
+                              context,
+                              'Room berhasil diperbarui.',
+                            );
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            _showMessage(
+                              context,
+                              'Perubahan room gagal disimpan.',
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Upload foto dari galeri akan disambungkan saat Firebase Storage diaktifkan. Saat ini cover bisa memakai foto profil.',
+                    style: TextStyle(
+                      color: _C.muted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(() {
+      nameController.dispose();
+      announcementController.dispose();
+      passwordController.dispose();
+    });
+  }
+
+  void _showOnlineMembers() {
+    final members = _roomMembers.values.toList()
+      ..sort((a, b) {
+        int rank(Map<String, dynamic> value) {
+          final role = '${value['role'] ?? 'member'}';
+          if (role == 'owner') return 0;
+          if (role == 'admin') return 1;
+          return 2;
+        }
+
+        final roleCompare = rank(a).compareTo(rank(b));
+        if (roleCompare != 0) return roleCompare;
+        return '${a['name'] ?? ''}'
+            .toLowerCase()
+            .compareTo('${b['name'] ?? ''}'.toLowerCase());
+      });
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _C.surface,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * .72,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 14, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.people_alt_rounded, color: _C.brown),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      '${members.length} orang online',
+                      style: const TextStyle(
+                        color: _C.text,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    onPressed: () => _showMessage(
+                      context,
+                      'Pencarian member akan ditambahkan.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: members.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Belum ada member.',
+                        style: TextStyle(color: _C.muted),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: members.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1),
+                      itemBuilder: (_, index) {
+                        final data = members[index];
+                        final role = '${data['role'] ?? 'member'}';
+                        final photo = '${data['photoUrl'] ?? ''}'.trim();
+                        final level = data['level'] is num
+                            ? (data['level'] as num).toInt()
+                            : 1;
+                        final vip = data['vip'] is num
+                            ? (data['vip'] as num).toInt()
+                            : 0;
+                        return ListTile(
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            _showMiniProfile(data);
+                          },
+                          leading: CircleAvatar(
+                            radius: 23,
+                            backgroundColor: _C.gold2,
+                            backgroundImage: photo.startsWith('http')
+                                ? NetworkImage(photo)
+                                : null,
+                            child: photo.startsWith('http')
+                                ? null
+                                : const Icon(
+                                    Icons.person_rounded,
+                                    color: _C.brown,
+                                  ),
+                          ),
+                          title: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${data['name'] ?? 'User'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _C.text,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              if (role == 'owner' || role == 'admin') ...[
+                                const SizedBox(width: 7),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: role == 'owner'
+                                        ? _C.gold2
+                                        : const Color(0xFFE7D8FF),
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  child: Text(
+                                    role == 'owner' ? 'OWNER' : 'ADMIN',
+                                    style: TextStyle(
+                                      color: role == 'owner'
+                                          ? _C.brown
+                                          : const Color(0xFF6D35A8),
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: Text(
+                            'ID ${data['cuanId'] ?? '-'}  •  LV $level${vip > 0 ? '  •  VIP $vip' : ''}',
+                            style: const TextStyle(
+                              color: _C.muted,
+                              fontSize: 11,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right_rounded,
+                            color: _C.brown2,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMiniProfile(Map<String, dynamic> data) {
+    final uid = '${data['uid'] ?? ''}';
+    final name = '${data['name'] ?? 'User'}';
+    final photo = '${data['photoUrl'] ?? ''}'.trim();
+    final cuanId = '${data['cuanId'] ?? '-'}';
+    final country = '${data['country'] ?? ''}';
+    final gender = '${data['gender'] ?? ''}';
+    final role = '${data['role'] ?? 'member'}';
+    final level = data['level'] is num ? (data['level'] as num).toInt() : 1;
+    final vip = data['vip'] is num ? (data['vip'] as num).toInt() : 0;
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    final isMe = uid.isNotEmpty && uid == myUid;
+    final seatIndex = data['seatIndex'] is num
+        ? (data['seatIndex'] as num).toInt()
+        : null;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Container(
+        margin: const EdgeInsets.fromLTRB(10, 80, 10, 10),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: _C.gold.withOpacity(.55)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: _C.gold2,
+                backgroundImage:
+                    photo.startsWith('http') ? NetworkImage(photo) : null,
+                child: photo.startsWith('http')
+                    ? null
+                    : const Icon(
+                        Icons.person_rounded,
+                        size: 46,
+                        color: _C.brown,
+                      ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                name,
+                style: const TextStyle(
+                  color: _C.text,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'ID $cuanId${country.isNotEmpty ? '  •  $country' : ''}',
+                style: const TextStyle(
+                  color: _C.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (gender.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  gender,
+                  style: const TextStyle(
+                    color: _C.muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _miniProfileChip('LV $level', Icons.auto_awesome_rounded),
+                  if (vip > 0)
+                    _miniProfileChip(
+                      'VIP $vip',
+                      Icons.workspace_premium_rounded,
+                    ),
+                  _miniProfileChip(
+                    role == 'owner'
+                        ? 'OWNER'
+                        : role == 'admin'
+                            ? 'ADMIN'
+                            : 'MEMBER',
+                    role == 'owner'
+                        ? Icons.home_rounded
+                        : role == 'admin'
+                            ? Icons.shield_rounded
+                            : Icons.person_rounded,
+                  ),
+                  if (seatIndex != null)
+                    _miniProfileChip(
+                      'SEAT ${seatIndex + 1}',
+                      Icons.event_seat_rounded,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.copy_rounded),
+                      label: const Text('Salin ID'),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: cuanId));
+                        Navigator.pop(sheetContext);
+                        _showMessage(context, 'ID $cuanId disalin.');
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.card_giftcard_rounded),
+                      label: const Text('Kirim Gift'),
+                      onPressed: () {
+                        _giftTarget = isMe ? 'Saya' : name;
+                        Navigator.pop(sheetContext);
+                        _showGifts();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              if (isMe && seatIndex != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: Icon(
+                          _micOn
+                              ? Icons.mic_off_rounded
+                              : Icons.mic_rounded,
+                        ),
+                        label: Text(_micOn ? 'Matikan Mic' : 'Nyalakan Mic'),
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _toggleMic();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.event_seat_outlined),
+                        label: const Text('Turun Seat'),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await _takeSeat(seatIndex);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (_isOwner && !isMe && uid.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: Icon(
+                          role == 'admin'
+                              ? Icons.person_remove_alt_1_rounded
+                              : Icons.admin_panel_settings_rounded,
+                        ),
+                        label: Text(
+                          role == 'admin'
+                              ? 'Hapus Admin'
+                              : 'Jadikan Admin',
+                        ),
+                        onPressed: () async {
+                          try {
+                            await _RoomRealtimeService.setMemberRole(
+                              widget.roomId!,
+                              uid,
+                              role == 'admin' ? 'member' : 'admin',
+                            );
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                          } catch (_) {
+                            if (mounted) {
+                              _showMessage(
+                                context,
+                                'Role member gagal diperbarui.',
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                        ),
+                        icon: const Icon(Icons.logout_rounded),
+                        label: const Text('Keluarkan'),
+                        onPressed: () async {
+                          try {
+                            await _RoomRealtimeService.kickMember(
+                              widget.roomId!,
+                              uid,
+                            );
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                            if (mounted) {
+                              _showMessage(
+                                context,
+                                '$name dikeluarkan dari room.',
+                              );
+                            }
+                          } catch (_) {
+                            if (mounted) {
+                              _showMessage(
+                                context,
+                                'Member gagal dikeluarkan.',
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniProfileChip(String text, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: _C.surface2,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _C.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: _C.gold),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: const TextStyle(
+              color: _C.brown,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _playGiftAnimation(IconData icon, String targetName) {
+    if (!_giftVisualEnabled) return;
+
     final myName = AppProfileState.name.value.trim();
     final normalizedTarget = myName.isNotEmpty && targetName == myName ? 'Saya' : targetName;
     final targetIndex = _seatNames.indexOf(normalizedTarget);
@@ -3244,12 +4790,22 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [_roomTop, _roomBottom],
           ),
+          image: _coverUrl.startsWith('http')
+              ? DecorationImage(
+                  image: NetworkImage(_coverUrl),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                    Colors.black.withOpacity(.64),
+                    BlendMode.darken,
+                  ),
+                )
+              : null,
         ),
         child: Stack(
           key: _roomStackKey,
@@ -3259,20 +4815,41 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 child: Row(
                   children: [
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          color: _roomText),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: _roomText,
+                      ),
                     ),
-                    const CircleAvatar(
-                      radius: 22,
-                      backgroundColor: _roomGold,
-                      child: Icon(Icons.person, color: _C.brown),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _isOwner
+                          ? _showRoomEditor
+                          : () => _showMessage(
+                                context,
+                                _announcement.trim().isEmpty
+                                    ? _roomName
+                                    : _announcement,
+                              ),
+                      child: CircleAvatar(
+                        radius: 22,
+                        backgroundColor: _roomGold,
+                        backgroundImage: _coverUrl.startsWith('http')
+                            ? NetworkImage(_coverUrl)
+                            : null,
+                        child: _coverUrl.startsWith('http')
+                            ? null
+                            : const Icon(
+                                Icons.home_rounded,
+                                color: _C.brown,
+                              ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 9),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3287,27 +4864,56 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               fontWeight: FontWeight.w900,
                             ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
-                            '${_roomCode.isEmpty ? 'Room' : 'ID $_roomCode'}  •  $_memberCount online  •  $_capacity seats',
+                            _roomCode.isEmpty ? 'Voice Room' : 'ID $_roomCode',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(.72),
-                              fontSize: 11,
+                              color: Colors.white.withOpacity(.68),
+                              fontSize: 10,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    _RoomIconButton(
-                      icon: Icons.ios_share_rounded,
-                      onTap: () => _showMessage(context, 'Link room disalin.'),
+                    InkWell(
+                      onTap: _showOnlineMembers,
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(.28),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(.10),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$_memberCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                     _RoomIconButton(
-                      icon: Icons.report_gmailerrorred_rounded,
-                      onTap: () => _showMessage(context, 'Report room'),
-                    ),
-                    _RoomIconButton(
-                      icon: Icons.settings_rounded,
-                      onTap: _showRoomSettings,
+                      icon: Icons.more_horiz_rounded,
+                      onTap: _showRoomTools,
                     ),
                     _RoomIconButton(
                       icon: Icons.power_settings_new_rounded,
@@ -3328,7 +4934,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       seatKeys: _seatKeys,
                       seatEmojis: _seatEmojis,
                       seatMicStates: _seatMicStates,
-                      onTap: (index) => _takeSeat(index),
+                      onTap: (index) => _handleSeatTap(index),
                     ),
                     const SizedBox(height: 8),
                     ValueListenableBuilder<List<_RoomEvent>>(
@@ -3421,26 +5027,35 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     ),
                     const SizedBox(width: 8),
                     _RoomBottomButton(
-                      icon: Icons.emoji_emotions_rounded,
-                      onTap: _showRoomEmojiPicker,
+                      icon: Icons.card_giftcard_rounded,
+                      active: true,
+                      onTap: _showGifts,
                     ),
                     _RoomBottomButton(
-                      icon: _speakerOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      onTap: () => _toggleSpeaker(),
+                      icon: Icons.mail_rounded,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ChatPage(),
+                        ),
+                      ),
                     ),
                     _RoomBottomButton(
-                      icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+                      icon: _micOn
+                          ? Icons.mic_rounded
+                          : Icons.mic_off_rounded,
                       active: _micOn,
                       onTap: () => _toggleMic(),
                     ),
                     _RoomBottomButton(
-                      icon: Icons.mail_rounded,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatPage())),
+                      icon: _speakerOn
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_off_rounded,
+                      onTap: () => _toggleSpeaker(),
                     ),
                     _RoomBottomButton(
-                      icon: Icons.card_giftcard_rounded,
-                      active: true,
-                      onTap: _showGifts,
+                      icon: Icons.grid_view_rounded,
+                      onTap: _showRoomExtras,
                     ),
                   ],
                 ),
