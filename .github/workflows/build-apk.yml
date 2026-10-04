@@ -10,8 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cache Gradle supaya dependency yang sudah pernah berhasil
-      # tidak perlu download ulang terus-menerus
       - uses: actions/cache@v4
         with:
           path: |
@@ -32,7 +30,6 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
-      # Pub get dengan retry
       - name: Flutter pub get
         run: |
           for attempt in 1 2 3; do
@@ -57,14 +54,39 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           set -e
-
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/cuanparty-release.jks
-
           test -s android/app/cuanparty-release.jks
-
           ls -lh android/app/cuanparty-release.jks
 
-      # Build APK dengan retry + ZEGO voice configuration
+      - name: Check ZEGO configuration
+        env:
+          ZEGO_APP_ID: ${{ secrets.ZEGO_APP_ID }}
+          ZEGO_APP_SIGN: ${{ secrets.ZEGO_APP_SIGN }}
+        run: |
+          set -e
+
+          CLEAN_ID="$(printf '%s' "$ZEGO_APP_ID" | tr -d '[:space:]')"
+          CLEAN_SIGN="$(printf '%s' "$ZEGO_APP_SIGN" | tr -d '\r\n')"
+
+          if [ -z "$CLEAN_ID" ]; then
+            echo "ERROR: ZEGO_APP_ID secret kosong."
+            exit 1
+          fi
+
+          if ! [[ "$CLEAN_ID" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: ZEGO_APP_ID bukan angka."
+            exit 1
+          fi
+
+          if [ -z "$CLEAN_SIGN" ]; then
+            echo "ERROR: ZEGO_APP_SIGN secret kosong."
+            exit 1
+          fi
+
+          echo "ZEGO_APP_ID OK."
+          echo "ZEGO_APP_SIGN OK."
+          echo "ZEGO CONFIG PASSED."
+
       - name: Build release APK
         env:
           KEYSTORE_FILE: app/cuanparty-release.jks
