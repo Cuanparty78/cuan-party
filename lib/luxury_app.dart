@@ -1,4 +1,5 @@
 
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:zego_express_engine/zego_express_engine.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'economy_service.dart';
 
 void main() => runApp(const CuanPartyApp());
@@ -24,6 +27,186 @@ class _RealtimeEconomyBuilder extends StatelessWidget {
   }
 }
 
+
+
+class _ZegoVoiceService {
+  _ZegoVoiceService._();
+
+  static const int _appID =
+      int.fromEnvironment('ZEGO_APP_ID', defaultValue: 0);
+  static const String _appSign =
+      String.fromEnvironment('ZEGO_APP_SIGN', defaultValue: '');
+
+  static bool _engineReady = false;
+  static bool _joined = false;
+  static bool _publishing = false;
+  static String? _activeRoomID;
+  static String? _localStreamID;
+  static final Set<String> _remoteStreams = <String>{};
+
+  static bool get configured => _appID > 0 && _appSign.isNotEmpty;
+  static bool get joined => _joined;
+
+  static String _safeID(String raw, {int maxLength = 64}) {
+    var value = raw.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    if (value.isEmpty) value = 'cuan_user';
+    if (value.length > maxLength) value = value.substring(0, maxLength);
+    return value;
+  }
+
+  static Future<void> _ensureEngine() async {
+    if (_engineReady) return;
+    if (!configured) {
+      throw StateError('ZEGO_NOT_CONFIGURED');
+    }
+
+    final profile = ZegoEngineProfile(
+      _appID,
+      ZegoScenario.StandardChatroom,
+      appSign: _appSign,
+    );
+
+    await ZegoExpressEngine.createEngineWithProfile(profile);
+
+    // Audio-only room. Keep the local microphone muted until the user
+    // explicitly turns the mic on from a seat.
+    await ZegoExpressEngine.instance.muteMicrophone(true);
+    await ZegoExpressEngine.instance.muteAllPlayStreamAudio(false);
+
+    ZegoExpressEngine.onRoomStreamUpdate =
+        (roomID, updateType, streamList, extendedData) {
+      if (roomID != _activeRoomID) return;
+
+      if (updateType == ZegoUpdateType.Add) {
+        for (final stream in streamList) {
+          if (_remoteStreams.add(stream.streamID)) {
+            ZegoExpressEngine.instance
+                .startPlayingStream(stream.streamID)
+                .catchError((_) {});
+          }
+        }
+      } else {
+        for (final stream in streamList) {
+          _remoteStreams.remove(stream.streamID);
+          ZegoExpressEngine.instance
+              .stopPlayingStream(stream.streamID)
+              .catchError((_) {});
+        }
+      }
+    };
+
+    _engineReady = true;
+  }
+
+  static Future<void> joinRoom({
+    required String roomID,
+    required String userID,
+    required String userName,
+  }) async {
+    await _ensureEngine();
+
+    final safeRoom = _safeID(roomID, maxLength: 120);
+    final safeUser = _safeID(userID);
+    final safeName = _safeID(
+      userName.trim().isEmpty ? 'CuanUser' : userName,
+      maxLength: 64,
+    );
+
+    if (_joined && _activeRoomID == safeRoom) return;
+
+    if (_joined) {
+      await leaveRoom();
+    }
+
+    final result = await ZegoExpressEngine.instance.loginRoom(
+      safeRoom,
+      ZegoUser(safeUser, safeName),
+    );
+
+    if (result.errorCode != 0) {
+      throw StateError('ZEGO_LOGIN_${result.errorCode}');
+    }
+
+    _activeRoomID = safeRoom;
+    _localStreamID = _safeID(
+      'room_${safeRoom}_user_${safeUser}',
+      maxLength: 240,
+    );
+    _joined = true;
+    _publishing = false;
+
+    // Existing remote streams are delivered via onRoomStreamUpdate after login.
+  }
+
+  static Future<bool> requestMicrophonePermission() async {
+    final status = await Permission.microphone.request();
+    return status.isGranted;
+  }
+
+  static Future<void> setMicrophoneEnabled(bool enabled) async {
+    if (!_joined) {
+      throw StateError('ZEGO_ROOM_NOT_JOINED');
+    }
+
+    if (enabled) {
+      final allowed = await requestMicrophonePermission();
+      if (!allowed) {
+        throw StateError('MIC_PERMISSION_DENIED');
+      }
+
+      // Start publishing only while the user is actually speaking.
+      if (!_publishing) {
+        await ZegoExpressEngine.instance.muteMicrophone(false);
+        await ZegoExpressEngine.instance
+            .startPublishingStream(_localStreamID!);
+        _publishing = true;
+      } else {
+        await ZegoExpressEngine.instance.muteMicrophone(false);
+      }
+    } else {
+      await ZegoExpressEngine.instance.muteMicrophone(true);
+      if (_publishing) {
+        await ZegoExpressEngine.instance.stopPublishingStream();
+        _publishing = false;
+      }
+    }
+  }
+
+  static Future<void> setSpeakerEnabled(bool enabled) async {
+    if (!_engineReady) return;
+    await ZegoExpressEngine.instance.muteAllPlayStreamAudio(!enabled);
+  }
+
+  static Future<void> leaveRoom() async {
+    if (!_engineReady) return;
+
+    try {
+      await ZegoExpressEngine.instance.muteMicrophone(true);
+      if (_publishing) {
+        await ZegoExpressEngine.instance.stopPublishingStream();
+      }
+    } catch (_) {}
+
+    _publishing = false;
+
+    for (final streamID in _remoteStreams.toList()) {
+      try {
+        await ZegoExpressEngine.instance.stopPlayingStream(streamID);
+      } catch (_) {}
+    }
+    _remoteStreams.clear();
+
+    if (_joined && _activeRoomID != null) {
+      try {
+        await ZegoExpressEngine.instance.logoutRoom(_activeRoomID);
+      } catch (_) {}
+    }
+
+    _joined = false;
+    _activeRoomID = null;
+    _localStreamID = null;
+  }
+}
 
 class CuanPartyApp extends StatelessWidget {
   const CuanPartyApp({super.key});
@@ -81,6 +264,369 @@ class _RoomEvent {
 }
 
 final ValueNotifier<List<_RoomEvent>> roomEvents = ValueNotifier<List<_RoomEvent>>([]);
+
+
+class _RoomRealtimeService {
+  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  static DocumentReference<Map<String, dynamic>> room(String roomId) =>
+      _db.collection('rooms').doc(roomId);
+
+  static String _displayName(User user) {
+    final fromState = AppProfileState.name.value.trim();
+    if (fromState.isNotEmpty) return fromState;
+    final fromAuth = (user.displayName ?? '').trim();
+    if (fromAuth.isNotEmpty) return fromAuth;
+    final email = (user.email ?? '').trim();
+    if (email.isNotEmpty) return email.split('@').first;
+    return 'User';
+  }
+
+  static Map<String, dynamic> _memberData(User user) => <String, dynamic>{
+        'uid': user.uid,
+        'name': _displayName(user),
+        'photoUrl': AppProfileState.photoUrl.value.trim().isNotEmpty
+            ? AppProfileState.photoUrl.value.trim()
+            : (user.photoURL ?? ''),
+        'cuanId': AppProfileState.cuanId.value,
+        'country': AppProfileState.country.value,
+        'lastSeen': FieldValue.serverTimestamp(),
+      };
+
+  static Future<DocumentReference<Map<String, dynamic>>> createRoom({
+    required String name,
+    required String announcement,
+    required int capacity,
+    required String country,
+    required bool isPrivate,
+    required String password,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+
+    final ref = _db.collection('rooms').doc();
+    final memberRef = ref.collection('members').doc(user.uid);
+    final roomCode = ref.id.substring(0, math.min(8, ref.id.length)).toUpperCase();
+    final batch = _db.batch();
+    batch.set(ref, <String, dynamic>{
+      'name': name.trim(),
+      'roomName': name.trim(),
+      'announcement': announcement.trim(),
+      'ownerId': user.uid,
+      'ownerName': _displayName(user),
+      'country': country.trim().isEmpty ? 'Indonesia' : country.trim(),
+      'capacity': capacity,
+      'giftTotal': 0,
+      'memberCount': 1,
+      'memberIds': <String>[user.uid],
+      'isPrivate': isPrivate,
+      'password': isPrivate ? password : '',
+      'isActive': true,
+      'roomCode': roomCode,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastActivityAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(memberRef, <String, dynamic>{
+      ..._memberData(user),
+      'joinedAt': FieldValue.serverTimestamp(),
+      'micOn': false,
+      'seatIndex': null,
+      'role': 'owner',
+    });
+    await batch.commit();
+    return ref;
+  }
+
+  static Future<void> joinRoom(String roomId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final roomRef = room(roomId);
+    final memberRef = roomRef.collection('members').doc(user.uid);
+
+    await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(roomRef);
+      if (!roomSnap.exists) throw StateError('ROOM_NOT_FOUND');
+      final roomData = roomSnap.data() ?? const <String, dynamic>{};
+      if (roomData['isActive'] == false) throw StateError('ROOM_CLOSED');
+
+      final memberSnap = await tx.get(memberRef);
+      final isNew = !memberSnap.exists;
+      if (isNew) {
+        final current = roomData['memberCount'] is num
+            ? (roomData['memberCount'] as num).toInt()
+            : 0;
+        tx.update(roomRef, <String, dynamic>{
+          'memberCount': current + 1,
+          'memberIds': FieldValue.arrayUnion(<String>[user.uid]),
+          'lastActivityAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        tx.update(roomRef, <String, dynamic>{
+          'memberIds': FieldValue.arrayUnion(<String>[user.uid]),
+          'lastActivityAt': FieldValue.serverTimestamp(),
+        });
+      }
+      tx.set(
+        memberRef,
+        <String, dynamic>{
+          ..._memberData(user),
+          if (isNew) 'joinedAt': FieldValue.serverTimestamp(),
+          if (isNew) 'micOn': false,
+          if (isNew) 'seatIndex': null,
+        },
+        SetOptions(merge: true),
+      );
+    });
+  }
+
+  static Future<void> heartbeat(String roomId, {int? seatIndex}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final roomRef = room(roomId);
+    final batch = _db.batch();
+    batch.set(
+      roomRef.collection('members').doc(user.uid),
+      <String, dynamic>{'lastSeen': FieldValue.serverTimestamp()},
+      SetOptions(merge: true),
+    );
+    if (seatIndex != null) {
+      batch.set(
+        roomRef.collection('seats').doc('$seatIndex'),
+        <String, dynamic>{'lastSeen': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
+  }
+
+  static Future<void> leaveRoom(String roomId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final roomRef = room(roomId);
+    final memberRef = roomRef.collection('members').doc(user.uid);
+
+    await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(roomRef);
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) return;
+      final memberData = memberSnap.data() ?? const <String, dynamic>{};
+      final seatIndex = memberData['seatIndex'];
+      if (seatIndex is num) {
+        tx.delete(roomRef.collection('seats').doc('${seatIndex.toInt()}'));
+      }
+      tx.delete(memberRef);
+      if (roomSnap.exists) {
+        final roomData = roomSnap.data() ?? const <String, dynamic>{};
+        final current = roomData['memberCount'] is num
+            ? (roomData['memberCount'] as num).toInt()
+            : 1;
+        tx.update(roomRef, <String, dynamic>{
+          'memberCount': math.max(0, current - 1),
+          'memberIds': FieldValue.arrayRemove(<String>[user.uid]),
+          'lastActivityAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    });
+  }
+
+  static Future<void> claimSeat(String roomId, int seatIndex) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final roomRef = room(roomId);
+    final memberRef = roomRef.collection('members').doc(user.uid);
+    final targetSeatRef = roomRef.collection('seats').doc('$seatIndex');
+
+    await _db.runTransaction((tx) async {
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) throw StateError('JOIN_FIRST');
+      final targetSnap = await tx.get(targetSeatRef);
+      if (targetSnap.exists) {
+        final occupant = '${targetSnap.data()?['uid'] ?? ''}';
+        if (occupant != user.uid) throw StateError('SEAT_TAKEN');
+      }
+      final memberData = memberSnap.data() ?? const <String, dynamic>{};
+      final oldSeat = memberData['seatIndex'];
+      if (oldSeat is num && oldSeat.toInt() != seatIndex) {
+        tx.delete(roomRef.collection('seats').doc('${oldSeat.toInt()}'));
+      }
+      tx.set(targetSeatRef, <String, dynamic>{
+        ..._memberData(user),
+        'seatIndex': seatIndex,
+        'micOn': memberData['micOn'] == true,
+        'claimedAt': FieldValue.serverTimestamp(),
+      });
+      tx.set(
+        memberRef,
+        <String, dynamic>{
+          'seatIndex': seatIndex,
+          'lastSeen': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      tx.update(roomRef, <String, dynamic>{
+        'lastActivityAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  static Future<void> releaseSeat(String roomId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final roomRef = room(roomId);
+    final memberRef = roomRef.collection('members').doc(user.uid);
+    await _db.runTransaction((tx) async {
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) return;
+      final memberData = memberSnap.data() ?? const <String, dynamic>{};
+      final seat = memberData['seatIndex'];
+      if (seat is num) {
+        tx.delete(roomRef.collection('seats').doc('${seat.toInt()}'));
+      }
+      tx.set(
+        memberRef,
+        <String, dynamic>{
+          'seatIndex': null,
+          'micOn': false,
+          'lastSeen': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      tx.update(roomRef, <String, dynamic>{
+        'lastActivityAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  static Future<void> setMic(String roomId, bool micOn, {int? seatIndex}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final roomRef = room(roomId);
+    final batch = _db.batch();
+    batch.set(
+      roomRef.collection('members').doc(user.uid),
+      <String, dynamic>{
+        'micOn': micOn,
+        'lastSeen': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+    if (seatIndex != null) {
+      batch.set(
+        roomRef.collection('seats').doc('$seatIndex'),
+        <String, dynamic>{
+          'micOn': micOn,
+          'lastSeen': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    }
+    batch.update(roomRef, <String, dynamic>{
+      'lastActivityAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  static Future<void> changeCapacity(String roomId, int capacity) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final roomRef = room(roomId);
+    final roomSnap = await roomRef.get();
+    if ('${roomSnap.data()?['ownerId'] ?? ''}' != user.uid) {
+      throw StateError('OWNER_ONLY');
+    }
+
+    final seats = await roomRef.collection('seats').get();
+    final batch = _db.batch();
+    for (final seat in seats.docs) {
+      final index = int.tryParse(seat.id);
+      if (index != null && index >= capacity) {
+        final uid = '${seat.data()['uid'] ?? ''}';
+        batch.delete(seat.reference);
+        if (uid.isNotEmpty) {
+          batch.set(
+            roomRef.collection('members').doc(uid),
+            <String, dynamic>{'seatIndex': null, 'micOn': false},
+            SetOptions(merge: true),
+          );
+        }
+      }
+    }
+    batch.update(roomRef, <String, dynamic>{
+      'capacity': capacity,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastActivityAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  static Future<void> sendChat(String roomId, String text) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    final messageRef = ref.collection('messages').doc();
+    final batch = _db.batch();
+    batch.set(messageRef, <String, dynamic>{
+      'type': 'chat',
+      'fromId': user.uid,
+      'fromName': _displayName(user),
+      'text': text.trim(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(ref, <String, dynamic>{
+      'lastActivityAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  static Future<void> sendGift({
+    required String roomId,
+    required String targetName,
+    required String giftName,
+    required int coinCost,
+    required int quantity,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    final messageRef = ref.collection('messages').doc();
+    final batch = _db.batch();
+    batch.set(messageRef, <String, dynamic>{
+      'type': 'gift',
+      'fromId': user.uid,
+      'fromName': _displayName(user),
+      'toName': targetName,
+      'giftName': giftName,
+      'quantity': quantity,
+      'coinCost': coinCost,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(ref, <String, dynamic>{
+      'giftTotal': FieldValue.increment(coinCost),
+      'lastActivityAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  static Future<void> closeRoom(String roomId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    final snap = await ref.get();
+    if ('${snap.data()?['ownerId'] ?? ''}' != user.uid) {
+      throw StateError('OWNER_ONLY');
+    }
+    await ref.update(<String, dynamic>{
+      'isActive': false,
+      'closedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+}
 
 void _addRoomEvent(_RoomEvent event) {
   roomEvents.value = [...roomEvents.value, event];
@@ -694,6 +1240,14 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 _CircleAction(
+                  icon: Icons.add_home_rounded,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateRoomPage()),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _CircleAction(
                   icon: Icons.search_rounded,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSearchPage())),
                 ),
@@ -732,7 +1286,7 @@ class _HomePageState extends State<HomePage> {
       children: [
         _MainTabBar(tabs: const ['Terakhir', 'Ikuti', 'Gabung'], selected: _mineTab, compact: true, onChanged: (v) => setState(() => _mineTab = v)),
         const SizedBox(height: 10),
-        const _EmptyStateCard(message: 'Belum ada room. Room yang benar-benar tersedia akan muncul di sini.'),
+        _MyRoomsRealtimeList(mode: _mineTab),
       ],
     );
   }
@@ -803,6 +1357,292 @@ class _HomePageState extends State<HomePage> {
 }
 
 
+
+class CreateRoomPage extends StatefulWidget {
+  const CreateRoomPage({super.key});
+
+  @override
+  State<CreateRoomPage> createState() => _CreateRoomPageState();
+}
+
+class _CreateRoomPageState extends State<CreateRoomPage> {
+  final _nameController = TextEditingController();
+  final _announcementController = TextEditingController();
+  final _passwordController = TextEditingController();
+  int _capacity = 10;
+  bool _private = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final baseName = AppProfileState.name.value.trim();
+    _nameController.text = baseName.isEmpty ? 'My Voice Room' : '$baseName Room';
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _announcementController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    final name = _nameController.text.trim();
+    if (name.length < 2) {
+      _showMessage(context, 'Nama room minimal 2 karakter.');
+      return;
+    }
+    if (_private && _passwordController.text.trim().length < 4) {
+      _showMessage(context, 'Password private room minimal 4 karakter.');
+      return;
+    }
+    if (FirebaseAuth.instance.currentUser == null) {
+      _showMessage(context, 'Login dulu untuk membuat room.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final ref = await _RoomRealtimeService.createRoom(
+        name: name,
+        announcement: _announcementController.text,
+        capacity: _capacity,
+        country: AppProfileState.country.value,
+        isPrivate: _private,
+        password: _passwordController.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RoomDetailPage(
+            roomId: ref.id,
+            roomName: name,
+            owner: AppProfileState.name.value.trim().isEmpty
+                ? 'Owner'
+                : AppProfileState.name.value.trim(),
+            seats: _capacity,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(context, 'Room gagal dibuat. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Buat Room')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+        children: [
+          const Text(
+            'VOICE ROOM',
+            style: TextStyle(color: _C.brown, fontWeight: FontWeight.w900, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          _LuxuryCard(
+            child: Column(
+              children: [
+                TextField(
+                  controller: _nameController,
+                  maxLength: 32,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Room',
+                    prefixIcon: Icon(Icons.mic_rounded),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _announcementController,
+                  maxLength: 120,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Announcement',
+                    hintText: 'Welcome everyone!',
+                    prefixIcon: Icon(Icons.campaign_rounded),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: _capacity,
+                  decoration: const InputDecoration(
+                    labelText: 'Jumlah Seat',
+                    prefixIcon: Icon(Icons.event_seat_rounded),
+                  ),
+                  items: const [10, 15, 20, 30]
+                      .map((v) => DropdownMenuItem(value: v, child: Text('$v Seat')))
+                      .toList(),
+                  onChanged: (v) => setState(() => _capacity = v ?? 10),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _private,
+                  title: const Text('Private Room', style: TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: Text(_private ? 'Masuk dengan password' : 'Semua user bisa masuk'),
+                  onChanged: (v) => setState(() => _private = v),
+                ),
+                if (_private) ...[
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    maxLength: 12,
+                    decoration: const InputDecoration(
+                      labelText: 'Password Room',
+                      prefixIcon: Icon(Icons.lock_rounded),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 52,
+            child: FilledButton.icon(
+              onPressed: _saving ? null : _create,
+              icon: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.add_home_rounded),
+              label: Text(_saving ? 'Membuat Room...' : 'Buat Room'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _C.brown,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MyRoomsRealtimeList extends StatelessWidget {
+  final String mode;
+  const _MyRoomsRealtimeList({required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: _EmptyStateCard(message: 'Login untuk melihat room milikmu dan room yang kamu gabungi.'),
+      );
+    }
+    if (mode == 'Ikuti') {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: _EmptyStateCard(message: 'Room yang diikuti akan muncul setelah fitur Follow Room diaktifkan.'),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('rooms')
+          .where('memberIds', arrayContains: user.uid)
+          .limit(50)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: _EmptyStateCard(message: 'Room Saya belum dapat dimuat dari server.'),
+          );
+        }
+        final docs = [...(snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])];
+        docs.removeWhere((d) => d.data()['isActive'] == false);
+        docs.sort((a, b) {
+          final at = a.data()['lastActivityAt'];
+          final bt = b.data()['lastActivityAt'];
+          final am = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+          final bm = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+          return bm.compareTo(am);
+        });
+        if (docs.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: [
+                const _EmptyStateCard(message: 'Belum ada room aktif.'),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateRoomPage())),
+                    icon: const Icon(Icons.add_home_rounded),
+                    label: const Text('Buat Room Sendiri'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return Column(
+          children: docs.map((doc) {
+            final d = doc.data();
+            final name = '${d['name'] ?? d['roomName'] ?? 'Voice Room'}';
+            final owner = '${d['ownerName'] ?? 'Host'}';
+            final capacity = d['capacity'] is num ? (d['capacity'] as num).toInt() : 10;
+            final count = d['memberCount'] is num ? (d['memberCount'] as num).toInt() : 0;
+            final mine = '${d['ownerId'] ?? ''}' == user.uid;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: _LuxuryCard(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RoomDetailPage(
+                      roomId: doc.id,
+                      roomName: name,
+                      owner: owner,
+                      seats: capacity,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: _C.gold2,
+                      child: Icon(mine ? Icons.home_rounded : Icons.mic_rounded, color: _C.brown),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900))),
+                              if (mine) const Text('OWNER', style: TextStyle(color: _C.gold, fontSize: 9, fontWeight: FontWeight.w900)),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text('$owner • $count online', style: const TextStyle(color: _C.muted, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: _C.brown2),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
 class _HotRoomsSection extends StatefulWidget {
   const _HotRoomsSection();
 
@@ -831,6 +1671,61 @@ class _HotRoomsSectionState extends State<_HotRoomsSection> {
         .snapshots();
   }
 
+  Future<void> _openRoom(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
+    final d = doc.data();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showMessage(context, 'Login dulu untuk masuk Voice Room.');
+      return;
+    }
+    final isPrivate = d['isPrivate'] == true;
+    final isOwner = '${d['ownerId'] ?? ''}' == user.uid;
+    if (isPrivate && !isOwner) {
+      final controller = TextEditingController();
+      final password = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Private Room'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password Room',
+              prefixIcon: Icon(Icons.lock_rounded),
+            ),
+            onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Masuk')),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (password == null) return;
+      if (password != '${d['password'] ?? ''}') {
+        if (mounted) _showMessage(context, 'Password room salah.');
+        return;
+      }
+    }
+    if (!mounted) return;
+    final name = '${d['name'] ?? d['roomName'] ?? 'Voice Room'}';
+    final owner = '${d['ownerName'] ?? d['hostName'] ?? 'Host'}';
+    final capacity = d['capacity'] is num ? (d['capacity'] as num).toInt() : 10;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RoomDetailPage(
+          roomId: doc.id,
+          roomName: name,
+          owner: owner,
+          seats: capacity,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -843,6 +1738,7 @@ class _HotRoomsSectionState extends State<_HotRoomsSection> {
           );
         }
         final docs = [...(snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])];
+        docs.removeWhere((d) => d.data()['isActive'] == false);
         docs.sort((a, b) {
           final av = a.data()['giftTotal'];
           final bv = b.data()['giftTotal'];
@@ -908,19 +1804,12 @@ class _HotRoomsSectionState extends State<_HotRoomsSection> {
                 final name = '${d['name'] ?? d['roomName'] ?? 'Voice Room'}';
                 final owner = '${d['ownerName'] ?? d['hostName'] ?? ''}';
                 final gift = d['giftTotal'] is num ? (d['giftTotal'] as num).toInt() : 0;
+                final count = d['memberCount'] is num ? (d['memberCount'] as num).toInt() : 0;
+                final isPrivate = d['isPrivate'] == true;
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                   child: _LuxuryCard(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RoomDetailPage(
-                          roomName: name,
-                          owner: owner.isEmpty ? 'Host' : owner,
-                          seats: 10,
-                        ),
-                      ),
-                    ),
+                    onTap: () => _openRoom(doc),
                     child: Row(
                       children: [
                         const CircleAvatar(
@@ -934,10 +1823,14 @@ class _HotRoomsSectionState extends State<_HotRoomsSection> {
                             children: [
                               Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.text, fontWeight: FontWeight.w900)),
                               if (owner.isNotEmpty)
-                                Text(owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.muted, fontSize: 11)),
+                                Text('$owner • $count online', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.muted, fontSize: 11)),
                             ],
                           ),
                         ),
+                        if (isPrivate) ...[
+                          const Icon(Icons.lock_rounded, color: _C.brown2, size: 17),
+                          const SizedBox(width: 7),
+                        ],
                         const Icon(Icons.card_giftcard_rounded, color: _C.gold, size: 18),
                         const SizedBox(width: 4),
                         Text(_formatCoins(gift), style: const TextStyle(color: _C.brown, fontWeight: FontWeight.w900)),
@@ -1278,11 +2171,13 @@ class RoomPage extends StatelessWidget {
 }
 
 class RoomDetailPage extends StatefulWidget {
+  final String? roomId;
   final String roomName;
   final String owner;
   final int seats;
   const RoomDetailPage({
     super.key,
+    this.roomId,
     required this.roomName,
     required this.owner,
     required this.seats,
@@ -1313,59 +2208,386 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   bool _micOn = false;
   bool _speakerOn = true;
   bool _joined = true;
+  bool _leftRealtime = false;
   int _capacity = 10;
+  int _memberCount = 0;
+  int? _mySeatIndex;
+  String _roomName = '';
+  String _ownerName = '';
+  String _ownerId = '';
+  String _roomCode = '';
+  String _announcement = '';
   String _feedFilter = 'all';
-  String _giftTarget = '';
+  String _giftTarget = 'Saya';
   late List<String?> _seatNames;
   late List<GlobalKey> _seatKeys;
+  final Map<int, bool> _seatMicStates = <int, bool>{};
   final GlobalKey _roomStackKey = GlobalKey();
   final List<_GiftFlight> _giftFlights = [];
   final Map<int, String> _seatEmojis = {};
   int _nextGiftFlightId = 0;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roomSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _seatSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _memberSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _eventSubscription;
+  Timer? _heartbeatTimer;
+  final Set<String> _knownRealtimeEventIds = <String>{};
+  bool _eventStreamInitialized = false;
+  bool _zegoJoined = false;
+
+  bool get _isRealtime => widget.roomId != null && widget.roomId!.isNotEmpty;
+  bool get _isOwner => FirebaseAuth.instance.currentUser?.uid == _ownerId;
 
   @override
   void initState() {
     super.initState();
+    _roomName = widget.roomName;
+    _ownerName = widget.owner;
     _capacity = [10, 15, 20, 30].contains(widget.seats) ? widget.seats : 10;
     _seatNames = _makeSeats(_capacity);
     _seatKeys = List.generate(_capacity, (_) => GlobalKey());
     _giftTarget = _firstGiftTarget();
+    if (_isRealtime) {
+      _startRealtimeRoom();
+    }
   }
 
-  List<String?> _makeSeats(int count) {
-    return List<String?>.filled(count, null);
+  List<String?> _makeSeats(int count) => List<String?>.filled(count, null);
+
+  String _firstGiftTarget() => 'Saya';
+
+  IconData _giftIconForName(String name) {
+    switch (name) {
+      case 'Royal Crown':
+        return Icons.workspace_premium_rounded;
+      case 'Golden Wings':
+        return Icons.flight_rounded;
+      case 'Love Crown':
+        return Icons.favorite_rounded;
+      case 'Fantasy':
+        return Icons.auto_awesome_rounded;
+      case 'Royal Car':
+        return Icons.directions_car_filled_rounded;
+      case 'Queen Crown':
+        return Icons.diamond_rounded;
+      case 'Royal Castle':
+        return Icons.castle_rounded;
+      default:
+        return Icons.card_giftcard_rounded;
+    }
   }
 
-  String _firstGiftTarget() {
-    return '';
+
+  Future<void> _connectZegoVoice() async {
+    if (!_isRealtime || !_joined) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    if (!_ZegoVoiceService.configured) {
+      if (mounted) {
+        _showMessage(
+          context,
+          'ZEGO belum dikonfigurasi di build. Room tetap jalan tanpa audio live.',
+        );
+      }
+      return;
+    }
+
+    try {
+      final displayName = AppProfileState.name.value.trim().isEmpty
+          ? 'CuanUser'
+          : AppProfileState.name.value.trim();
+
+      await _ZegoVoiceService.joinRoom(
+        roomID: widget.roomId!,
+        userID: user.uid,
+        userName: displayName,
+      );
+
+      await _ZegoVoiceService.setSpeakerEnabled(_speakerOn);
+
+      if (!mounted) return;
+      setState(() => _zegoJoined = true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _zegoJoined = false);
+      _showMessage(context, 'Audio ZEGO gagal tersambung.');
+      debugPrint('ZEGO join error: $e');
+    }
+  }
+
+  Future<void> _disconnectZegoVoice() async {
+    try {
+      await _ZegoVoiceService.leaveRoom();
+    } catch (e) {
+      debugPrint('ZEGO leave error: $e');
+    }
+    if (mounted) setState(() => _zegoJoined = false);
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final next = !_speakerOn;
+    try {
+      await _ZegoVoiceService.setSpeakerEnabled(next);
+    } catch (_) {}
+    if (mounted) setState(() => _speakerOn = next);
+  }
+
+  Future<void> _startRealtimeRoom() async {
+    final roomId = widget.roomId!;
+    roomEvents.value = const <_RoomEvent>[];
+
+    _roomSubscription = _RoomRealtimeService.room(roomId).snapshots().listen((snap) {
+      if (!mounted || !snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final nextCapacity = data['capacity'] is num ? (data['capacity'] as num).toInt() : _capacity;
+      setState(() {
+        _roomName = '${data['name'] ?? data['roomName'] ?? _roomName}';
+        _ownerName = '${data['ownerName'] ?? _ownerName}';
+        _ownerId = '${data['ownerId'] ?? ''}';
+        _roomCode = '${data['roomCode'] ?? ''}';
+        _announcement = '${data['announcement'] ?? ''}';
+        _memberCount = data['memberCount'] is num ? (data['memberCount'] as num).toInt() : _memberCount;
+        if (nextCapacity != _capacity && [10, 15, 20, 30].contains(nextCapacity)) {
+          _capacity = nextCapacity;
+          _seatNames = _makeSeats(_capacity);
+          _seatKeys = List.generate(_capacity, (_) => GlobalKey());
+          _seatMicStates.clear();
+        }
+      });
+      if (data['isActive'] == false && mounted) {
+        _showMessage(context, 'Room sudah ditutup oleh owner.');
+        Navigator.maybePop(context);
+      }
+    });
+
+    _seatSubscription = _RoomRealtimeService.room(roomId)
+        .collection('seats')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final names = _makeSeats(_capacity);
+      final micStates = <int, bool>{};
+      final myUid = FirebaseAuth.instance.currentUser?.uid;
+      for (final doc in snapshot.docs) {
+        final index = int.tryParse(doc.id);
+        if (index == null || index < 0 || index >= names.length) continue;
+        final data = doc.data();
+        final uid = '${data['uid'] ?? ''}';
+        final name = '${data['name'] ?? 'User'}';
+        names[index] = uid == myUid ? 'Saya' : name;
+        micStates[index] = data['micOn'] == true;
+      }
+      setState(() {
+        _seatNames = names;
+        _seatMicStates
+          ..clear()
+          ..addAll(micStates);
+      });
+    });
+
+    _memberSubscription = _RoomRealtimeService.room(roomId)
+        .collection('members')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final myUid = FirebaseAuth.instance.currentUser?.uid;
+      final now = DateTime.now();
+      var active = 0;
+      int? mySeat;
+      var myMic = false;
+      var foundMe = false;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final seen = data['lastSeen'];
+        final recent = seen is! Timestamp || now.difference(seen.toDate()).inSeconds <= 90;
+        if (recent) active++;
+        if (doc.id == myUid) {
+          foundMe = true;
+          final seat = data['seatIndex'];
+          mySeat = seat is num ? seat.toInt() : null;
+          myMic = data['micOn'] == true;
+        }
+      }
+      setState(() {
+        _memberCount = active;
+        _mySeatIndex = mySeat;
+        _micOn = myMic;
+        _joined = foundMe;
+      });
+    });
+
+    _eventSubscription = _RoomRealtimeService.room(roomId)
+        .collection('messages')
+        .orderBy('createdAt')
+        .limitToLast(200)
+        .snapshots()
+        .listen((snapshot) {
+      final events = <_RoomEvent>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final type = '${data['type'] ?? 'chat'}';
+        final from = '${data['fromName'] ?? 'User'}';
+        if (type == 'gift') {
+          events.add(_RoomEvent.gift(
+            from,
+            '${data['toName'] ?? 'User'}',
+            '${data['giftName'] ?? 'Gift'}',
+            data['coinCost'] is num ? (data['coinCost'] as num).toInt() : 0,
+          ));
+        } else {
+          events.add(_RoomEvent.chat(from, '${data['text'] ?? ''}'));
+        }
+      }
+      roomEvents.value = events;
+
+      if (_eventStreamInitialized) {
+        for (final change in snapshot.docChanges) {
+          if (change.type != DocumentChangeType.added) continue;
+          if (_knownRealtimeEventIds.contains(change.doc.id)) continue;
+          final data = change.doc.data();
+          if (data != null && '${data['type'] ?? ''}' == 'gift') {
+            final giftName = '${data['giftName'] ?? 'Gift'}';
+            final rawTarget = '${data['toName'] ?? ''}';
+            final myName = AppProfileState.name.value.trim();
+            final target = myName.isNotEmpty && rawTarget == myName ? 'Saya' : rawTarget;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _playGiftAnimation(_giftIconForName(giftName), target);
+            });
+          }
+        }
+      }
+      _knownRealtimeEventIds
+        ..clear()
+        ..addAll(snapshot.docs.map((d) => d.id));
+      _eventStreamInitialized = true;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      });
+    });
+
+    try {
+      await _RoomRealtimeService.joinRoom(roomId);
+      await _RoomRealtimeService.heartbeat(roomId);
+      await _connectZegoVoice();
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+        _RoomRealtimeService.heartbeat(roomId, seatIndex: _mySeatIndex).catchError((_) {});
+      });
+    } catch (_) {
+      if (mounted) _showMessage(context, 'Gagal masuk room realtime.');
+    }
   }
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
+    _roomSubscription?.cancel();
+    _seatSubscription?.cancel();
+    _memberSubscription?.cancel();
+    _eventSubscription?.cancel();
+    if (_isRealtime && !_leftRealtime) {
+      _leftRealtime = true;
+      _ZegoVoiceService.leaveRoom().catchError((_) {});
+      _RoomRealtimeService.leaveRoom(widget.roomId!).catchError((_) {});
+    }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _toggleJoin() {
-    setState(() {
-      _joined = !_joined;
-      if (!_joined) {
-        _micOn = false;
-        for (var i = 0; i < _seatNames.length; i++) {
-          if (_seatNames[i] != null) _seatNames[i] = null;
+  Future<void> _toggleJoin() async {
+    if (!_isRealtime) {
+      setState(() {
+        _joined = !_joined;
+        if (!_joined) {
+          _micOn = false;
+          _seatNames = _makeSeats(_capacity);
         }
+      });
+      _showMessage(context, _joined ? 'Kamu masuk room.' : 'Kamu keluar dari room.');
+      return;
+    }
+
+    try {
+      if (_joined) {
+        try {
+          await _ZegoVoiceService.setMicrophoneEnabled(false);
+        } catch (_) {}
+        await _disconnectZegoVoice();
+        await _RoomRealtimeService.leaveRoom(widget.roomId!);
+        if (!mounted) return;
+        setState(() {
+          _joined = false;
+          _micOn = false;
+          _mySeatIndex = null;
+        });
+        _showMessage(context, 'Kamu keluar dari room.');
+      } else {
+        await _RoomRealtimeService.joinRoom(widget.roomId!);
+        if (!mounted) return;
+        setState(() => _joined = true);
+        await _connectZegoVoice();
+        _showMessage(
+          context,
+          _zegoJoined
+              ? 'Kamu masuk room. Audio live tersambung.'
+              : 'Kamu masuk room.',
+        );
       }
-    });
-    _showMessage(context, _joined ? 'Kamu masuk room.' : 'Kamu keluar dari room.');
+    } catch (_) {
+      if (mounted) _showMessage(context, 'Status room gagal diperbarui.');
+    }
   }
 
-  void _toggleMic() {
+  Future<void> _toggleMic() async {
     if (!_joined) {
       _showMessage(context, 'Masuk room dulu untuk menggunakan mic.');
       return;
     }
-    setState(() => _micOn = !_micOn);
+    if (_isRealtime && _mySeatIndex == null) {
+      _showMessage(context, 'Ambil seat dulu untuk menyalakan mic.');
+      return;
+    }
+    final next = !_micOn;
+    if (_isRealtime) {
+      try {
+        if (!_zegoJoined) {
+          await _connectZegoVoice();
+        }
+
+        if (!_zegoJoined) {
+          _showMessage(context, 'Audio ZEGO belum tersambung.');
+          return;
+        }
+
+        await _ZegoVoiceService.setMicrophoneEnabled(next);
+        await _RoomRealtimeService.setMic(
+          widget.roomId!,
+          next,
+          seatIndex: _mySeatIndex,
+        );
+      } on StateError catch (e) {
+        if (!mounted) return;
+        if ('$e'.contains('MIC_PERMISSION_DENIED')) {
+          _showMessage(context, 'Izin mikrofon diperlukan untuk menyalakan mic.');
+        } else {
+          _showMessage(context, 'Mic audio gagal diaktifkan.');
+        }
+        return;
+      } catch (e) {
+        debugPrint('ZEGO mic error: $e');
+        if (mounted) _showMessage(context, 'Mic gagal diperbarui.');
+        return;
+      }
+    }
+    if (mounted) setState(() => _micOn = next);
   }
 
   void _showRoomEmojiPicker() {
@@ -1406,13 +2628,19 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final value = _messageController.text.trim();
     if (value.isEmpty) return;
-    setState(() {
+    _messageController.clear();
+    if (_isRealtime) {
+      try {
+        await _RoomRealtimeService.sendChat(widget.roomId!, value);
+      } catch (_) {
+        if (mounted) _showMessage(context, 'Pesan gagal dikirim.');
+      }
+    } else {
       _addRoomEvent(_RoomEvent.chat('Saya', value));
-      _messageController.clear();
-    });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -1424,7 +2652,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     });
   }
 
-  void _takeSeat(int index) {
+  Future<void> _takeSeat(int index) async {
     if (!_joined) {
       _showMessage(context, 'Masuk room dulu untuk mengambil seat.');
       return;
@@ -1433,23 +2661,63 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       _showMessage(context, 'Seat ini sudah ditempati.');
       return;
     }
-    setState(() {
-      for (var i = 0; i < _seatNames.length; i++) {
-        if (_seatNames[i] != null) _seatNames[i] = null;
+    if (_isRealtime) {
+      try {
+        if (_mySeatIndex == index || _seatNames[index] == 'Saya') {
+          if (_micOn) {
+            try {
+              await _ZegoVoiceService.setMicrophoneEnabled(false);
+            } catch (_) {}
+            await _RoomRealtimeService.setMic(
+              widget.roomId!,
+              false,
+              seatIndex: _mySeatIndex,
+            );
+          }
+          await _RoomRealtimeService.releaseSeat(widget.roomId!);
+        } else {
+          await _RoomRealtimeService.claimSeat(widget.roomId!, index);
+        }
+      } on StateError catch (e) {
+        if (!mounted) return;
+        if ('$e'.contains('SEAT_TAKEN')) {
+          _showMessage(context, 'Seat ini baru saja diambil user lain.');
+        } else {
+          _showMessage(context, 'Seat gagal diperbarui.');
+        }
+      } catch (_) {
+        if (mounted) _showMessage(context, 'Seat gagal diperbarui.');
       }
+      return;
+    }
+    setState(() {
+      _seatNames = _makeSeats(_capacity);
       _seatNames[index] = 'Saya';
+      _mySeatIndex = index;
     });
   }
 
-  void _changeCapacity(int value) {
+  Future<void> _changeCapacity(int value) async {
+    if (_isRealtime) {
+      if (!_isOwner) {
+        Navigator.pop(context);
+        _showMessage(context, 'Hanya owner yang bisa mengubah jumlah seat.');
+        return;
+      }
+      try {
+        await _RoomRealtimeService.changeCapacity(widget.roomId!, value);
+        if (!mounted) return;
+        Navigator.pop(context);
+        _showMessage(context, 'Room sekarang $value kursi.');
+      } catch (_) {
+        if (mounted) _showMessage(context, 'Jumlah seat gagal diperbarui.');
+      }
+      return;
+    }
     setState(() {
       _capacity = value;
-      final old = _seatNames.where((name) => name != null).toList();
       _seatNames = _makeSeats(value);
       _seatKeys = List.generate(value, (_) => GlobalKey());
-      for (var i = 0; i < old.length && i < _seatNames.length; i++) {
-        _seatNames[i] = old[i];
-      }
       _giftTarget = _firstGiftTarget();
     });
     Navigator.pop(context);
@@ -1457,6 +2725,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   void _showRoomSettings() {
+    if (_isRealtime && !_isOwner) {
+      _showMessage(context, 'Room Settings hanya untuk owner.');
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: _C.surface,
@@ -1525,7 +2797,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   void _playGiftAnimation(IconData icon, String targetName) {
-    final targetIndex = _seatNames.indexOf(targetName);
+    final myName = AppProfileState.name.value.trim();
+    final normalizedTarget = myName.isNotEmpty && targetName == myName ? 'Saya' : targetName;
+    final targetIndex = _seatNames.indexOf(normalizedTarget);
     final stackContext = _roomStackKey.currentContext;
     if (targetIndex < 0 || stackContext == null || targetIndex >= _seatKeys.length) {
       _showMessage(context, 'Gift terkirim ke $targetName');
@@ -1759,10 +3033,26 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           SizedBox(
                             height: 48,
                             child: FilledButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (coins < totalCost) {
                                   _showMessage(context, 'Coin tidak cukup. Butuh ${_formatCoins(totalCost)} Coin.');
                                   return;
+                                }
+                                if (_isRealtime) {
+                                  try {
+                                    await _RoomRealtimeService.sendGift(
+                                      roomId: widget.roomId!,
+                                      targetName: target == 'Saya'
+                                          ? (AppProfileState.name.value.trim().isEmpty ? 'Saya' : AppProfileState.name.value.trim())
+                                          : target,
+                                      giftName: selected.$1,
+                                      coinCost: totalCost,
+                                      quantity: quantity,
+                                    );
+                                  } catch (_) {
+                                    if (mounted) _showMessage(context, 'Gift gagal dikirim ke room.');
+                                    return;
+                                  }
                                 }
                                 _setCoins(coins - totalCost);
                                 LevelProgressStore.add('Wealth', totalCost);
@@ -1772,12 +3062,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                 }
                                 if (isSelfGift) _addDiamonds(totalCost);
                                 _giftTarget = target;
-                                _addRoomEvent(_RoomEvent.gift('Saya', target, selected.$1, totalCost));
+                                if (!_isRealtime) {
+                                  _addRoomEvent(_RoomEvent.gift('Saya', target, selected.$1, totalCost));
+                                }
                                 _addWalletTransaction(
                                   'Gift ${selected.$1} x$quantity → $target -${_formatCoins(totalCost)} Coin${isSelfGift ? ' / +${_formatCoins(totalCost)} Diamond' : ''}',
                                 );
-                                Navigator.pop(sheetContext);
+                                if (sheetContext.mounted) Navigator.pop(sheetContext);
                                 WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted) return;
                                   _playGiftAnimation(selected.$2, target);
                                   _showMessage(
                                     context,
@@ -1906,25 +3199,37 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               const SizedBox(height: 14),
               ListTile(
-                leading: const Icon(Icons.picture_in_picture_alt_rounded,
-                    color: _C.gold),
-                title: const Text('Minimize'),
-                subtitle: const Text('Kembali ke halaman sebelumnya'),
-                onTap: () {
+                leading: const Icon(Icons.logout_rounded, color: _C.gold),
+                title: const Text('Keluar Room'),
+                subtitle: const Text('Keluar dari room dan kembali ke Home'),
+                onTap: () async {
                   Navigator.pop(sheetContext);
-                  Navigator.pop(context);
+                  if (_isRealtime && !_leftRealtime) {
+                    _leftRealtime = true;
+                    try {
+                      await _RoomRealtimeService.leaveRoom(widget.roomId!);
+                    } catch (_) {}
+                  }
+                  if (mounted) Navigator.pop(context);
                 },
               ),
-              ListTile(
-                leading:
-                    const Icon(Icons.close_rounded, color: _C.brown),
-                title: const Text('Close Room'),
-                subtitle: const Text('Tutup room dan keluar'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  Navigator.pop(context);
-                },
-              ),
+              if (_isRealtime && _isOwner)
+                ListTile(
+                  leading: const Icon(Icons.power_settings_new_rounded, color: Colors.redAccent),
+                  title: const Text('Tutup Room'),
+                  subtitle: const Text('Room ditutup untuk semua user'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    try {
+                      await _RoomRealtimeService.closeRoom(widget.roomId!);
+                      _leftRealtime = true;
+                      await _RoomRealtimeService.leaveRoom(widget.roomId!);
+                    } catch (_) {
+                      if (mounted) _showMessage(context, 'Room gagal ditutup.');
+                    }
+                    if (mounted) Navigator.pop(context);
+                  },
+                ),
               const SizedBox(height: 4),
             ],
           ),
@@ -1932,6 +3237,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       ),
     );
   }
+
 
 
   @override
@@ -1972,7 +3278,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.roomName,
+                            _roomName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1982,7 +3288,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                             ),
                           ),
                           Text(
-                            'Room ID belum tersedia  •  $_capacity seats',
+                            '${_roomCode.isEmpty ? 'Room' : 'ID $_roomCode'}  •  $_memberCount online  •  $_capacity seats',
                             style: TextStyle(
                               color: Colors.white.withOpacity(.72),
                               fontSize: 11,
@@ -2021,7 +3327,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       seats: _seatNames,
                       seatKeys: _seatKeys,
                       seatEmojis: _seatEmojis,
-                      onTap: _takeSeat,
+                      seatMicStates: _seatMicStates,
+                      onTap: (index) => _takeSeat(index),
                     ),
                     const SizedBox(height: 8),
                     ValueListenableBuilder<List<_RoomEvent>>(
@@ -2057,9 +3364,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                 border: Border.all(
                                     color: Colors.white.withOpacity(.08)),
                               ),
-                              child: const Text(
-                                "Welcome everyone! Let's chat and have fun together.",
-                                style: TextStyle(
+                              child: Text(
+                                _announcement.trim().isEmpty
+                                    ? "Welcome everyone! Let's chat and have fun together."
+                                    : _announcement,
+                                style: const TextStyle(
                                   color: _roomGold,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 14,
@@ -2117,12 +3426,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     ),
                     _RoomBottomButton(
                       icon: _speakerOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      onTap: () => setState(() => _speakerOn = !_speakerOn),
+                      onTap: () => _toggleSpeaker(),
                     ),
                     _RoomBottomButton(
                       icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
                       active: _micOn,
-                      onTap: _toggleMic,
+                      onTap: () => _toggleMic(),
                     ),
                     _RoomBottomButton(
                       icon: Icons.mail_rounded,
@@ -2234,8 +3543,15 @@ class _SeatGrid extends StatelessWidget {
   final List<String?> seats;
   final List<GlobalKey> seatKeys;
   final Map<int, String> seatEmojis;
+  final Map<int, bool> seatMicStates;
   final ValueChanged<int> onTap;
-  const _SeatGrid({required this.seats, required this.seatKeys, required this.seatEmojis, required this.onTap});
+  const _SeatGrid({
+    required this.seats,
+    required this.seatKeys,
+    required this.seatEmojis,
+    this.seatMicStates = const <int, bool>{},
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2275,6 +3591,25 @@ class _SeatGrid extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withOpacity(.16)),
                       child: Text(emoji, style: const TextStyle(fontSize: 34)),
+                    ),
+                  if (name != null)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: seatMicStates[index] == true ? const Color(0xFF39D98A) : const Color(0xFF5D6378),
+                          border: Border.all(color: _RoomDetailPageState._roomBottom, width: 2),
+                        ),
+                        child: Icon(
+                          seatMicStates[index] == true ? Icons.mic_rounded : Icons.mic_off_rounded,
+                          color: Colors.white,
+                          size: 11,
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -4334,6 +5669,22 @@ void _showExchange(BuildContext context) {
   ).whenComplete(controller.dispose);
 }
 
+
+int _profileLevelFromData(Map<String, dynamic> data, String field) {
+  final specific = data[field];
+  if (specific is num) {
+    return math.max(1, math.min(120, specific.toInt()));
+  }
+
+  // Backward-compatible fallback for accounts that still only have `level`.
+  final legacy = data['level'];
+  if (legacy is num) {
+    return math.max(1, math.min(120, legacy.toInt()));
+  }
+
+  return 1;
+}
+
 class AppProfileState {
   static final ValueNotifier<String> cuanId = ValueNotifier<String>('');
   static final ValueNotifier<String> name = ValueNotifier<String>('');
@@ -4388,9 +5739,24 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<List<String>>(
-      valueListenable: AppProfileState.photos,
-      builder: (context, photos, _) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .snapshots(),
+      builder: (context, levelSnapshot) {
+        final levelData =
+            levelSnapshot.data?.data() ?? <String, dynamic>{};
+        final wealthLevel =
+            _profileLevelFromData(levelData, 'wealthLevel');
+        final charmLevel =
+            _profileLevelFromData(levelData, 'charmLevel');
+        final gameLevel =
+            _profileLevelFromData(levelData, 'gameLevel');
+
+        return ValueListenableBuilder<List<String>>(
+          valueListenable: AppProfileState.photos,
+          builder: (context, photos, _) {
         final scale = _s(context);
         final name = AppProfileState.name.value.trim().isEmpty
             ? 'CUAN PARTY'
@@ -4404,9 +5770,6 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
         final country = AppProfileState.country.value.trim().isEmpty
             ? 'Indonesia'
             : AppProfileState.country.value.trim();
-        final level = AppProfileState.level.value < 1
-            ? 1
-            : AppProfileState.level.value;
         final primary = AppProfileState.photoUrl.value.trim();
         final effectivePhotos = photos.isNotEmpty
             ? photos.take(5).toList()
@@ -4579,7 +5942,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
 
                         // 3 exact equal columns. Crest + LV stay inside their own 1/3 slot.
                         _PVCleanLevelRow(
-                          level: level,
+                          wealthLevel: wealthLevel,
+                          charmLevel: charmLevel,
+                          gameLevel: gameLevel,
                           scale: scale,
                         ),
                         SizedBox(height: _d(9, scale)),
@@ -4707,6 +6072,8 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
               ],
             ),
           ),
+        );
+          },
         );
       },
     );
@@ -5173,11 +6540,15 @@ class _PVCleanIdentityPill extends StatelessWidget {
 }
 
 class _PVCleanLevelRow extends StatelessWidget {
-  final int level;
+  final int wealthLevel;
+  final int charmLevel;
+  final int gameLevel;
   final double scale;
 
   const _PVCleanLevelRow({
-    required this.level,
+    required this.wealthLevel,
+    required this.charmLevel,
+    required this.gameLevel,
     required this.scale,
   });
 
@@ -5188,9 +6559,27 @@ class _PVCleanLevelRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(child: _PVCleanLevelCompact(type: 'WEALTH', level: level, scale: scale)),
-          Expanded(child: _PVCleanLevelCompact(type: 'CHARM', level: level, scale: scale)),
-          Expanded(child: _PVCleanLevelCompact(type: 'GAME', level: level, scale: scale)),
+          Expanded(
+            child: _PVCleanLevelCompact(
+              type: 'WEALTH',
+              level: wealthLevel,
+              scale: scale,
+            ),
+          ),
+          Expanded(
+            child: _PVCleanLevelCompact(
+              type: 'CHARM',
+              level: charmLevel,
+              scale: scale,
+            ),
+          ),
+          Expanded(
+            child: _PVCleanLevelCompact(
+              type: 'GAME',
+              level: gameLevel,
+              scale: scale,
+            ),
+          ),
         ],
       ),
     );
@@ -6897,20 +8286,9 @@ class ProfilePage extends StatelessWidget {
         final level = levelValue is num
             ? levelValue.toInt().clamp(1, 999)
             : 1;
-final wealthValue = data['wealthLevel'];
-final wealthLevel = wealthValue is num
-    ? wealthValue.toInt().clamp(1, 120)
-    : 1;
-
-final charmValue = data['charmLevel'];
-final charmLevel = charmValue is num
-    ? charmValue.toInt().clamp(1, 120)
-    : 1;
-
-final gameValue = data['gameLevel'];
-final gameLevel = gameValue is num
-    ? gameValue.toInt().clamp(1, 120)
-    : 1;
+final wealthLevel = _profileLevelFromData(data, 'wealthLevel');
+        final charmLevel = _profileLevelFromData(data, 'charmLevel');
+        final gameLevel = _profileLevelFromData(data, 'gameLevel');
         final coinValue = data['coin'];
         final coin = coinValue is num ? coinValue.toInt() : 0;
 
@@ -7632,13 +9010,7 @@ class _LevelPageState extends State<LevelPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Existing Level data/function is intentionally retained.
-    // This V42 changes presentation only.
-    final current = 0;
-    final level = math.max(1, AppProfileState.level.value);
-    final target = 0;
-    final need = 0;
-    const progress = 0.0;
+    final user = FirebaseAuth.instance.currentUser;
 
     final how = type == 'Game'
         ? ['Aktivitas Game', 'Event Game', 'Fitur Game']
@@ -7646,7 +9018,28 @@ class _LevelPageState extends State<LevelPage> {
             ? ['Receiving Gifts']
             : ['Sending Gifts', 'Buy a Vehicle', 'Buy Avatar Frame'];
 
-    return Scaffold(
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: user == null
+          ? null
+          : FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? <String, dynamic>{};
+        final field = type == 'Charm'
+            ? 'charmLevel'
+            : type == 'Game'
+                ? 'gameLevel'
+                : 'wealthLevel';
+        final level = _profileLevelFromData(data, field);
+
+        // EXP is still placeholder until the real EXP fields are connected.
+        const current = 0;
+        const target = 0;
+        const progress = 0.0;
+
+        return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -7805,6 +9198,8 @@ class _LevelPageState extends State<LevelPage> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 }
