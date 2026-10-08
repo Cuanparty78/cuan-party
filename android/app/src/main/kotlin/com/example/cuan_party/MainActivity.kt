@@ -8,12 +8,9 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // ZEGO normally auto-registers through Flutter's generated registrant.
-        // This guard explicitly attaches it when the current Flutter/Android
-        // embedding did not register the plugin, which otherwise causes
-        // MissingPluginException on plugins.zego.im/zego_express_engine.
-        if (!flutterEngine.plugins.has(ZegoExpressEnginePlugin::class.java)) {
-            flutterEngine.plugins.add(ZegoExpressEnginePlugin())
-        }
+        // Force ZEGO to detach and attach again so its MethodChannel
+        // plugins.zego.im/zego_express_engine always gets a live handler.
+        flutterEngine.plugins.remove(ZegoExpressEnginePlugin::class.java)
+        flutterEngine.plugins.add(ZegoExpressEnginePlugin())
     }
 }
