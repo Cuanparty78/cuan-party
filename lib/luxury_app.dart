@@ -34,8 +34,9 @@ class _ZegoVoiceService {
 
   static const int _appID =
       int.fromEnvironment('ZEGO_APP_ID', defaultValue: 0);
-  static const String _appSign =
+  static const String _rawAppSign =
       String.fromEnvironment('ZEGO_APP_SIGN', defaultValue: '');
+  static String get _appSign => _rawAppSign.trim();
 
   // Serialize SDK operations so a late login cannot undo a leave/mic toggle.
   static Future<void> _operations = Future<void>.value();
@@ -71,6 +72,11 @@ class _ZegoVoiceService {
     if (_engineReady) return;
     if (!configured) {
       throw StateError('ZEGO_NOT_CONFIGURED');
+    }
+    if (_appID > 0xffffffff ||
+        !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(_appSign)) {
+      throw StateError('ZEGO_CONFIG_INVALID: Periksa App ID dan AppSign '
+          '64 karakter dari proyek yang sama. Temporary token bukan AppSign.');
     }
 
     final profile = ZegoEngineProfile(
@@ -345,11 +351,27 @@ class _RoomRealtimeService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw StateError('LOGIN_REQUIRED');
 
-    final ref = _db.collection('rooms').doc();
+    // Public account ID is also the stable room ID. Read the authoritative
+    // account document rather than generating another random Firestore ID.
+    final account = await _db.collection('users').doc(user.uid).get();
+    final roomCode = '${account.data()?['cuanId'] ?? ''}'.trim();
+    if (!RegExp(r'^[0-9]+$').hasMatch(roomCode)) {
+      throw StateError('ACCOUNT_ID_REQUIRED');
+    }
+    final ref = _db.collection('rooms').doc(roomCode);
     final memberRef = ref.collection('members').doc(user.uid);
-    final roomCode = ref.id.substring(0, math.min(8, ref.id.length)).toUpperCase();
-    final batch = _db.batch();
-    batch.set(ref, <String, dynamic>{
+    await _db.runTransaction((tx) async {
+      final previousRoom = await tx.get(ref);
+      final previousMember = await tx.get(memberRef);
+      final previous = previousRoom.data() ?? const <String, dynamic>{};
+      if (previousRoom.exists && '${previous['ownerId'] ?? ''}' != user.uid) {
+        throw StateError('ROOM_ID_CONFLICT');
+      }
+      // Reuse the owner's room without resetting gifts, members or history.
+      final memberIds = (previous['memberIds'] as List?)
+          ?.map((value) => '$value').toSet() ?? <String>{};
+      memberIds.add(user.uid);
+      tx.set(ref, <String, dynamic>{
       'name': name.trim(),
       'roomName': name.trim(),
       'announcement': announcement.trim(),
@@ -357,27 +379,28 @@ class _RoomRealtimeService {
       'ownerName': _displayName(user),
       'country': country.trim().isEmpty ? 'Indonesia' : country.trim(),
       'capacity': capacity,
-      'giftTotal': 0,
-      'memberCount': 1,
-      'memberIds': <String>[user.uid],
+      if (!previousRoom.exists) 'giftTotal': 0,
+      'memberCount': memberIds.length,
+      'memberIds': memberIds.toList(),
       'isPrivate': isPrivate,
       'password': isPrivate ? password : '',
       'isActive': true,
       'roomCode': roomCode,
+      'ownerCuanId': roomCode,
       'coverUrl': AppProfileState.photoUrl.value.trim(),
       'chatEnabled': true,
-      'createdAt': FieldValue.serverTimestamp(),
+      if (!previousRoom.exists) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'lastActivityAt': FieldValue.serverTimestamp(),
-    });
-    batch.set(memberRef, <String, dynamic>{
+      }, SetOptions(merge: true));
+      tx.set(memberRef, <String, dynamic>{
       ..._memberData(user),
-      'joinedAt': FieldValue.serverTimestamp(),
-      'micOn': false,
-      'seatIndex': null,
+      if (!previousMember.exists) 'joinedAt': FieldValue.serverTimestamp(),
+      if (!previousMember.exists) 'micOn': false,
+      if (!previousMember.exists) 'seatIndex': null,
       'role': 'owner',
+      }, SetOptions(merge: true));
     });
-    await batch.commit();
     return ref;
   }
 
@@ -1563,7 +1586,12 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      _showMessage(context, 'Room gagal dibuat. Coba lagi.');
+      final message = '$e'.contains('ACCOUNT_ID_REQUIRED')
+          ? 'ID akun belum tersedia. Buka ulang akun sebelum membuat room.'
+          : '$e'.contains('ROOM_ID_CONFLICT')
+              ? 'ID room sudah dimiliki akun lain. Hubungi pengelola.'
+              : 'Room gagal dibuat. Coba lagi.';
+      _showMessage(context, message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
