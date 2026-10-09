@@ -43,6 +43,12 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+            // ZEGO dispatches Dart calls to Java methods by reflection.
+            // Keep the SDK classes and method names in release builds.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
