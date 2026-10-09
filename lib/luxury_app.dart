@@ -730,7 +730,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _MainTabBar(tabs: const ['Terakhir', 'Ikuti', 'Gabung'], selected: _mineTab, compact: true, onChanged: (v) => setState(() => _mineTab = v)),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         const _EmptyStateCard(message: 'Belum ada room. Room yang benar-benar tersedia akan muncul di sini.'),
       ],
     );
@@ -755,11 +755,11 @@ class _HomePageState extends State<HomePage> {
       children: [
         const Padding(
           padding: EdgeInsets.fromLTRB(20, 6, 20, 10),
-          child: Text('Discover', style: TextStyle(color: _C.text, fontSize: 20, fontWeight: FontWeight.w900)),
+          child: Text('Discover', style: TextStyle(color: _C.text, fontSize: 15, fontWeight: FontWeight.w900)),
         ),
         const Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-          child: Text('GAME', style: TextStyle(color: _C.brown, fontSize: 14, fontWeight: FontWeight.w900)),
+          child: Text('GAME', style: TextStyle(color: _C.brown, fontSize: 12.5, fontWeight: FontWeight.w900)),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -987,7 +987,7 @@ class _DiscoverEventBanner extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: _C.text, fontSize: 16, fontWeight: FontWeight.w900)),
+                  Text(title, style: const TextStyle(color: _C.text, fontSize: 13.5, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 3),
                   Text(subtitle, style: const TextStyle(color: _C.muted, fontSize: 12)),
                 ],
@@ -2207,7 +2207,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           filled: true,
                           fillColor: Colors.black.withOpacity(.28),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(28),
+                            borderRadius: BorderRadius.circular(22),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
@@ -2313,8 +2313,8 @@ class _RoomMiniProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final width = math.min(size.width - 24, 430.0);
-    final maxHeight = math.min(size.height * .86, 760.0);
+    final width = math.min(size.width - 72, 330.0);
+    final maxHeight = math.min(size.height * .68, 590.0);
     final isKnown = data.cuanId != '—';
     final vipText = data.vip > 0 ? 'VIP${data.vip}' : 'MEMBER';
 
@@ -2325,7 +2325,7 @@ class _RoomMiniProfileCard extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(24),
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -2342,7 +2342,7 @@ class _RoomMiniProfileCard extends StatelessWidget {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(22),
           child: Stack(
             children: [
               Positioned(
@@ -2362,7 +2362,7 @@ class _RoomMiniProfileCard extends StatelessWidget {
               ),
               SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+                padding: const EdgeInsets.fromLTRB(13, 14, 13, 14),
                 child: Column(
                   children: [
                     Align(
@@ -2371,14 +2371,14 @@ class _RoomMiniProfileCard extends StatelessWidget {
                         behavior: HitTestBehavior.opaque,
                         onTap: onClose,
                         child: Container(
-                          width: 40,
-                          height: 40,
+                          width: 34,
+                          height: 34,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: const Color(0xFF3A2315),
                             border: Border.all(color: const Color(0xFFE5B34A), width: 1.4),
                           ),
-                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 23),
+                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                         ),
                       ),
                     ),
@@ -2405,7 +2405,7 @@ class _RoomMiniProfileCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Color(0xFF4B2813),
-                                    fontSize: 27,
+                                    fontSize: 22,
                                     height: 1,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -2426,7 +2426,7 @@ class _RoomMiniProfileCard extends StatelessWidget {
                               ],
                               if (data.country.toLowerCase().contains('indonesia')) ...[
                                 const SizedBox(width: 8),
-                                const Text('🇮🇩', style: TextStyle(fontSize: 18)),
+                                const Text('🇮🇩', style: TextStyle(fontSize: 15)),
                               ],
                             ],
                           ),
@@ -2457,10 +2457,10 @@ class _RoomMiniProfileCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 13),
+                          const SizedBox(height: 10),
                           SizedBox(
-                            width: 250,
-                            height: 48,
+                            width: 210,
+                            height: 42,
                             child: ElevatedButton.icon(
                               onPressed: onFollow,
                               icon: const Icon(Icons.person_add_alt_1_rounded, size: 22),
@@ -2531,23 +2531,23 @@ class _RoomMiniProfileHero extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        height: 188,
+        height: 142,
         child: Stack(
           alignment: Alignment.center,
           children: [
             Positioned(
               top: 14,
-              child: Icon(Icons.auto_awesome_rounded, color: const Color(0x55C5871C), size: 170),
+              child: Icon(Icons.auto_awesome_rounded, color: const Color(0x55C5871C), size: 118),
             ),
             Positioned(
               top: 0,
-              child: Icon(Icons.workspace_premium_rounded, color: const Color(0xFFD6A036), size: 56),
+              child: Icon(Icons.workspace_premium_rounded, color: const Color(0xFFD6A036), size: 42),
             ),
             Positioned(
-              top: 40,
+              top: 29,
               child: Container(
-                width: 124,
-                height: 124,
+                width: 94,
+                height: 94,
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -2574,8 +2574,8 @@ class _RoomMiniProfileHero extends StatelessWidget {
             Positioned(
               bottom: 0,
               child: Container(
-                constraints: const BoxConstraints(minWidth: 122),
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                constraints: const BoxConstraints(minWidth: 96),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(colors: [Color(0xFF2F1B10), Color(0xFF6D431C), Color(0xFF2F1B10)]),
@@ -2585,7 +2585,7 @@ class _RoomMiniProfileHero extends StatelessWidget {
                 child: Text(
                   vipText,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFFFFD879), fontSize: 18, fontWeight: FontWeight.w900),
+                  style: const TextStyle(color: Color(0xFFFFD879), fontSize: 15, fontWeight: FontWeight.w900),
                 ),
               ),
             ),
@@ -2617,7 +2617,7 @@ class _RoomMiniLevelStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 68,
+      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E8),
@@ -2646,7 +2646,7 @@ class _RoomMiniLevelCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (_, box) {
-        final iconSize = math.min(box.maxHeight * .70, box.maxWidth * .42);
+        final iconSize = math.min(box.maxHeight * .62, box.maxWidth * .34);
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -2662,7 +2662,7 @@ class _RoomMiniLevelCell extends StatelessWidget {
                 child: Text(
                   text,
                   maxLines: 1,
-                  style: const TextStyle(color: Color(0xFF4F2B13), fontSize: 16, fontWeight: FontWeight.w900),
+                  style: const TextStyle(color: Color(0xFF4F2B13), fontSize: 14, fontWeight: FontWeight.w900),
                 ),
               ),
             ),
@@ -2676,7 +2676,7 @@ class _RoomMiniLevelCell extends StatelessWidget {
 class _RoomMiniDivider extends StatelessWidget {
   const _RoomMiniDivider();
   @override
-  Widget build(BuildContext context) => Container(width: 1, height: 34, color: const Color(0xFFC99C55));
+  Widget build(BuildContext context) => Container(width: 1, height: 28, color: const Color(0xFFC99C55));
 }
 
 class _RoomMiniRoleMedal extends StatelessWidget {
@@ -2687,8 +2687,8 @@ class _RoomMiniRoleMedal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 112,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      width: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [Color(0xFF3A2111), Color(0xFF6F461D), Color(0xFF3A2111)]),
         borderRadius: BorderRadius.circular(18),
@@ -2697,12 +2697,12 @@ class _RoomMiniRoleMedal extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: const Color(0xFFFFD66E), size: 19),
+          Icon(icon, color: const Color(0xFFFFD66E), size: 16),
           const SizedBox(width: 6),
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(label, maxLines: 1, style: const TextStyle(color: Color(0xFFFFE5A0), fontSize: 13, fontWeight: FontWeight.w900)),
+              child: Text(label, maxLines: 1, style: const TextStyle(color: Color(0xFFFFE5A0), fontSize: 11.5, fontWeight: FontWeight.w900)),
             ),
           ),
         ],
@@ -2722,7 +2722,7 @@ class _RoomMiniStats extends StatelessWidget {
     final values = [followers, following, visitors];
     const labels = ['Pengikut', 'Mengikuti', 'Visitors'];
     return Container(
-      height: 78,
+      height: 66,
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E8),
         borderRadius: BorderRadius.circular(20),
@@ -2738,9 +2738,9 @@ class _RoomMiniStats extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('${values[index]}', style: const TextStyle(color: Color(0xFF4B2812), fontSize: 21, height: 1, fontWeight: FontWeight.w900)),
+                        Text('${values[index]}', style: const TextStyle(color: Color(0xFF4B2812), fontSize: 18, height: 1, fontWeight: FontWeight.w900)),
                         const SizedBox(height: 5),
-                        Text(labels[index], style: const TextStyle(color: Color(0xFF76553A), fontSize: 12, fontWeight: FontWeight.w700)),
+                        Text(labels[index], style: const TextStyle(color: Color(0xFF76553A), fontSize: 10.5, fontWeight: FontWeight.w700)),
                       ],
                     ),
                   ),
@@ -2759,7 +2759,7 @@ class _RoomMiniBadgePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 11, 12, 13),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E8),
         borderRadius: BorderRadius.circular(20),
@@ -2781,8 +2781,8 @@ class _RoomMiniBadgePreview extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(5, (index) {
               return Container(
-                width: 50,
-                height: 50,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(colors: [Color(0xFFFFF2CC), Color(0xFFE8C177)]),
@@ -2791,7 +2791,7 @@ class _RoomMiniBadgePreview extends StatelessWidget {
                 child: Icon(
                   [Icons.favorite_rounded, Icons.nightlight_round, Icons.pets_rounded, Icons.diamond_rounded, Icons.auto_awesome_rounded][index],
                   color: const Color(0xFF9A651A),
-                  size: 25,
+                  size: 20,
                 ),
               );
             }),
@@ -2829,17 +2829,17 @@ class _RoomMiniActions extends StatelessWidget {
             child: Column(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(colors: [Color(0xFF382012), Color(0xFF6B431E)]),
                     border: Border.all(color: const Color(0xFFE0AD44), width: 1.2),
                   ),
-                  child: Icon(item.$1, color: const Color(0xFFFFDB7D), size: 23),
+                  child: Icon(item.$1, color: const Color(0xFFFFDB7D), size: 19),
                 ),
                 const SizedBox(height: 5),
-                Text(item.$2, maxLines: 1, style: const TextStyle(color: Color(0xFF5D3C22), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                Text(item.$2, maxLines: 1, style: const TextStyle(color: Color(0xFF5D3C22), fontSize: 9.5, fontWeight: FontWeight.w800)),
               ],
             ),
           ),
@@ -5111,9 +5111,9 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                 : <String>[]);
 
         final heroH = _d(505, scale);
-        final avatarSize = _d(166, scale);
+        final avatarSize = _d(258, scale);
         final horizontal = _d(24, scale);
-        final sectionGap = _d(18, scale);
+        final sectionGap = _d(14, scale);
 
         return Scaffold(
           backgroundColor: const Color(0xFFF4E4C9),
@@ -5191,13 +5191,17 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                         // Keep the avatar inside the body layer so it paints ABOVE
                         // the cream section while still overlapping the photo area.
                         SizedBox(
-                          height: avatarSize * .56,
-                          child: Transform.translate(
-                            offset: Offset(0, -avatarSize * .48),
-                            child: Center(
-                              child: SizedBox(
-                                width: avatarSize,
-                                height: avatarSize,
+                          height: avatarSize * .55,
+                          child: OverflowBox(
+                            alignment: Alignment.topCenter,
+                            minWidth: avatarSize,
+                            maxWidth: avatarSize,
+                            minHeight: avatarSize,
+                            maxHeight: avatarSize,
+                            child: Transform.translate(
+                              offset: Offset(0, -avatarSize * .50),
+                              child: SizedBox.square(
+                                dimension: avatarSize,
                                 child: _PVCleanAvatar(
                                   photoUrl: effectivePhotos.isNotEmpty
                                       ? effectivePhotos.first
@@ -5217,7 +5221,7 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                             ),
                           ),
                         ),
-                        SizedBox(height: _d(8, scale)),
+                        SizedBox(height: _d(0, scale)),
                         Text(
                           name,
                           maxLines: 1,
@@ -5225,19 +5229,19 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: const Color(0xFF4D2B13),
-                            fontSize: _d(28, scale),
+                            fontSize: _d(30, scale),
                             height: 1.05,
                             fontWeight: FontWeight.w900,
                             letterSpacing: .2,
                           ),
                         ),
-                        SizedBox(height: _d(12, scale)),
+                        SizedBox(height: _d(9, scale)),
                         _PVCleanIdentityPill(
                           gender: gender,
                           country: country,
                           scale: scale,
                         ),
-                        SizedBox(height: _d(10, scale)),
+                        SizedBox(height: _d(7, scale)),
                         GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () => _copyId(context, id),
@@ -5253,28 +5257,28 @@ class _ProfileViewPageState extends State<ProfileViewPage> {
                                   'ID : $id',
                                   style: TextStyle(
                                     color: const Color(0xFF765233),
-                                    fontSize: _d(16, scale),
+                                    fontSize: _d(19, scale),
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
                                 SizedBox(width: _d(7, scale)),
                                 Icon(
                                   Icons.copy_rounded,
-                                  size: _d(16, scale),
+                                  size: _d(18, scale),
                                   color: const Color(0xFFB98628),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        SizedBox(height: _d(18, scale)),
+                        SizedBox(height: _d(11, scale)),
 
                         // 3 exact equal columns. Crest + LV stay inside their own 1/3 slot.
                         _PVCleanLevelRow(
                           level: level,
                           scale: scale,
                         ),
-                        SizedBox(height: _d(12, scale)),
+                        SizedBox(height: _d(9, scale)),
 
                         // 3 exact equal columns with each number/label centered in its own column.
                         _PVCleanStatsBar(
@@ -5418,12 +5422,12 @@ class _PVCleanBodyBackground extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFFFFFAF0),
-            Color(0xFFF8EBCF),
-            Color(0xFFF3DFC0),
+            Color(0xFFFFFBF2),
+            Color(0xFFF7E6C6),
+            Color(0xFFF0D7AA),
             Color(0xFFFFF8E9),
           ],
-          stops: [0, .30, .72, 1],
+          stops: [0, .28, .70, 1],
         ),
       ),
       child: Stack(
@@ -7593,9 +7597,21 @@ final gameLevel = gameValue is num
         final svipValue = data['svip'];
         final svip = svipValue is num ? svipValue.toInt() : 0;
 
-        return SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFFFFBF2),
+                Color(0xFFF7E7C9),
+                Color(0xFFFFF9EE),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -7636,7 +7652,7 @@ final gameLevel = gameValue is num
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: _C.text,
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
                           ),
@@ -7647,7 +7663,7 @@ final gameLevel = gameValue is num
                               ? 'CUAN ID belum tersedia'
                               : 'ID: $cuanId',
                           style: const TextStyle(
-                            color: Color(0xFFF6E5C5),
+                            color: _C.muted,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -7906,7 +7922,8 @@ final gameLevel = gameValue is num
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         );
       },
