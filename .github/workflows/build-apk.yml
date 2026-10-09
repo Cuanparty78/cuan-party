@@ -66,7 +66,7 @@ jobs:
           set -e
 
           CLEAN_ID="$(printf '%s' "$ZEGO_APP_ID" | tr -d '[:space:]')"
-          CLEAN_SIGN="$(printf '%s' "$ZEGO_APP_SIGN" | tr -d '\r\n')"
+          CLEAN_SIGN="$(printf '%s' "$ZEGO_APP_SIGN" | tr -d '[:space:]')"
 
           if [ -z "$CLEAN_ID" ]; then
             echo "ERROR: ZEGO_APP_ID secret kosong."
@@ -78,10 +78,18 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$CLEAN_SIGN" ]; then
-            echo "ERROR: ZEGO_APP_SIGN secret kosong."
+          if ! [[ "$CLEAN_SIGN" =~ ^[0-9a-fA-F]{64}$ ]]; then
+            echo "ERROR: ZEGO_APP_SIGN wajib AppSign 64 karakter hex dari console, bukan temporary token."
             exit 1
           fi
+          if [ "$CLEAN_ID" != "46360202" ]; then
+            echo "ERROR: ZEGO_APP_ID tidak cocok dengan proyek CUAN_PARTY yang digunakan untuk tes iPhone."
+            exit 1
+          fi
+          # Normalize the values actually passed to Flutter as well as checking
+          # them. Never print the AppSign in build logs.
+          echo "ZEGO_APP_ID=$CLEAN_ID" >> "$GITHUB_ENV"
+          echo "ZEGO_APP_SIGN=$CLEAN_SIGN" >> "$GITHUB_ENV"
 
           echo "ZEGO_APP_ID OK."
           echo "ZEGO_APP_SIGN OK."
@@ -93,9 +101,6 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-          ZEGO_APP_ID: ${{ secrets.ZEGO_APP_ID }}
-          ZEGO_APP_SIGN: ${{ secrets.ZEGO_APP_SIGN }}
 
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs=-Xmx4g
@@ -126,6 +131,9 @@ jobs:
 
           echo "APK BUILD FAILED AFTER 3 ATTEMPTS."
           exit 1
+
+      - name: Verify ZEGO native methods in release APK
+        run: python3 scripts/verify_zego_apk.py build/app/outputs/flutter-apk/app-release.apk
 
       - uses: actions/upload-artifact@v4
         with:
