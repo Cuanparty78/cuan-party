@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:zego_express_engine/zego_express_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'economy_service.dart';
+import 'slot_kingdom_page.dart';
 
 void main() => runApp(const CuanPartyApp());
 
@@ -3658,6 +3659,17 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
+                    _roomToolTile(
+                      icon: Icons.casino_rounded,
+                      label: 'SLOT KINGDOM',
+                      highlighted: true,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        openSlotKingdom(context, inRoom: true, openWallet: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletPage()));
+                        });
+                      },
+                    ),
                     _roomToolTile(
                       icon: Icons.extension_rounded,
                       label: 'Monster Crush',
@@ -13193,6 +13205,7 @@ class GameHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final games = [
+      ('SLOT KINGDOM', Icons.casino_rounded),
       ('Ludo', Icons.sports_esports_rounded),
       ('Monster Crush', Icons.extension_rounded),
       ('UNO', Icons.style_rounded),
@@ -13263,10 +13276,13 @@ class GameHubPage extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _LuxuryCard(
                 onTap: () {
-                  _showMessage(
-                    context,
-                    '${game.$1} akan terhubung ke modul game.',
-                  );
+                  if (game.$1 == 'SLOT KINGDOM') {
+                    openSlotKingdom(context, openWallet: () async {
+                      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletPage()));
+                    });
+                  } else {
+                    _showMessage(context, '${game.$1} akan terhubung ke modul game.');
+                  }
                 },
                 child: Row(
                   children: [

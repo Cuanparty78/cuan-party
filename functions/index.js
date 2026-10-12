@@ -858,3 +858,7 @@ exports.sendRoomGift = onCall(async (request) => {
     return result;
   });
 });
+
+Object.assign(exports, require('./slot_kingdom').install({
+  db, onCall, HttpsError, requireAuth, economyFrom, FieldValue,
+}));
