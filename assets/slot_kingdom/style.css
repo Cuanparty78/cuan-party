@@ -96,3 +96,8 @@ body:not(.expanded) main{height:var(--mini-height)}
 body:has(#gamePanel[hidden]) .room{height:100svh}
 @media(orientation:landscape) and (max-height:550px){body:not(.expanded) main{height:100svh}body:not(.expanded) .room{height:100svh}}
 
+/* Flutter already reserves the room area outside this WebView. Use its whole
+   viewport rather than applying the standalone mini height a second time. */
+body.embedded .room{display:none}
+body.embedded main{height:100svh;min-height:0;width:100%;max-width:none;position:relative}
+

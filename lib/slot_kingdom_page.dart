@@ -91,7 +91,10 @@ class _SlotKingdomPageState extends State<SlotKingdomPage> with WidgetsBindingOb
       final result = await FirebaseFunctions.instanceFor(region: 'asia-southeast2').httpsCallable(name).call(message['data']);
       reply = {'id': id, 'ok': true, 'data': result.data};
     } on FirebaseFunctionsException catch (error) {
-      reply = {'id': id, 'ok': false, 'error': error.message ?? 'Server tidak dapat dihubungi.', 'code': error.code};
+      final description = error.code == 'not-found'
+          ? 'Layanan SLOT KINGDOM belum tersedia. Coba kembali nanti.'
+          : error.message ?? 'Server tidak dapat dihubungi.';
+      reply = {'id': id, 'ok': false, 'error': description, 'code': error.code};
     } catch (_) {
       reply = {'id': id, 'ok': false, 'error': 'Koneksi terputus. Buka kembali game untuk melanjutkan.'};
     }

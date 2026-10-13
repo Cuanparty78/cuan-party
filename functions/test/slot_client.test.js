@@ -6,7 +6,7 @@ const ReelMotion=require(path.join(root,'reel-motion')),WinFX=require(path.join(
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 function harness(remote,storage=new Map()){
  const waits=[];let timer=0;const cancelled=new Set();
- function element(){return {textContent:'',innerHTML:'',disabled:false,hidden:false,children:[],dataset:{},classList:{add(){},remove(){},toggle(){}},style:{setProperty(){}},setAttribute(){},replaceChildren(){this.children=[]},append(x){this.children.push(x)},get firstElementChild(){return this.children[0]},showModal(){this.open=true},close(){this.open=false},clientHeight:300,clientWidth:360,animate(){return {finished:new Promise(r=>waits.push(r)),cancel(){}}}};}
+ function element(){const attrs=new Map(),properties=new Map();return {textContent:'',innerHTML:'',disabled:false,hidden:false,children:[],dataset:{},classList:{add(){},remove(){},toggle(){}},style:{setProperty:(k,v)=>properties.set(k,v),getPropertyValue:k=>properties.get(k)},setAttribute:(k,v)=>attrs.set(k,v),getAttribute:k=>attrs.get(k),replaceChildren(){this.children=[]},append(x){this.children.push(x)},get firstElementChild(){return this.children[0]},showModal(){this.open=true},close(){this.open=false},clientHeight:300,clientWidth:360,animate(){return {finished:new Promise(r=>waits.push(r)),cancel(){}}}};}
  const elements=new Map([...html.matchAll(/id="([^"]+)"/g)].map(([,id])=>[id,element()]));
  const channel=[];const window={addEventListener(){},SlotKingdomHost:{postMessage:m=>channel.push(JSON.parse(m))}};
  const schedule=fn=>{const id=++timer;waits.push(()=>{if(!cancelled.has(id))fn()});return id;};
@@ -31,4 +31,18 @@ test('bridge matches response IDs and preserves terminal error codes',async()=>{
  vm.runInContext(fs.readFileSync(path.join(root,'account-bridge.js'),'utf8'),c);
  const first=vm.runInContext("AccountBridge.request('state')",c);window.slotKingdomReply({id:messages[0].id,ok:true,data:{uid:'alice'}});assert.equal((await first).uid,'alice');
  const second=vm.runInContext("AccountBridge.request('spin')",c);window.slotKingdomReply({id:messages[1].id,ok:false,error:'Saldo kurang',code:'resource-exhausted'});await assert.rejects(()=>second,e=>e.code==='resource-exhausted');
+});
+
+test('board fills available width even when account loading fails; motion keeps its size',async()=>{
+ const ui=harness(async()=>{throw Object.assign(Error('Layanan belum tersedia'),{code:'not-found'});});
+ for(let i=0;i<12;i++)await Promise.resolve();
+ const board=ui.elements.get('board');
+ assert.equal(board.style.getPropertyValue('--symbol-size'),'54px');
+ assert.equal(ui.elements.get('spin').disabled,true);
+ board.clientWidth=420;board.clientHeight=400;
+ vm.runInContext('resizeBoard()',ui.context);
+ assert.equal(board.style.getPropertyValue('--symbol-size'),'64px');
+ board.setAttribute('aria-busy','true');board.clientWidth=240;
+ vm.runInContext('resizeBoard()',ui.context);
+ assert.equal(board.style.getPropertyValue('--symbol-size'),'64px');
 });
