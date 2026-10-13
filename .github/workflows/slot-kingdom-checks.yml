@@ -1,7 +1,7 @@
 name: SLOT KINGDOM integration checks
 on:
   pull_request:
-    paths: ['functions/**', 'assets/slot_kingdom/**', 'lib/slot_kingdom_page.dart', 'lib/luxury_app.dart', 'pubspec.yaml', '.github/workflows/slot-kingdom-checks.yml']
+    paths: ['functions/**', 'assets/slot_kingdom/**', 'lib/**', 'test/**', 'pubspec.yaml', '.github/workflows/slot-kingdom-checks.yml']
   workflow_dispatch:
 jobs:
   backend:
@@ -22,4 +22,5 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze lib/slot_kingdom_page.dart --no-fatal-infos --no-fatal-warnings
+      - run: flutter analyze lib/slot_kingdom_page.dart lib/lucky_bag.dart lib/economy_service.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
+      - run: flutter test test/lucky_bag_test.dart

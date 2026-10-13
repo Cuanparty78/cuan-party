@@ -11,6 +11,7 @@ import 'package:zego_express_engine/zego_express_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'economy_service.dart';
 import 'slot_kingdom_page.dart';
+import 'lucky_bag.dart';
 
 void main() => runApp(const CuanPartyApp());
 
@@ -42,6 +43,7 @@ class _ZegoVoiceService {
   // Serialize SDK operations so a late login cannot undo a leave/mic toggle.
   static Future<void> _operations = Future<void>.value();
   static bool _speakerEnabled = true;
+  static final ValueNotifier<String> status = ValueNotifier('Voice belum terhubung');
   static int _roomGeneration = 0;
 
   static Future<void> _run(Future<void> Function() action) {
@@ -94,6 +96,19 @@ class _ZegoVoiceService {
     await ZegoExpressEngine.instance.muteMicrophone(true);
     await ZegoExpressEngine.instance.muteAllPlayStreamAudio(!_speakerEnabled);
 
+    ZegoExpressEngine.onRoomStateChanged = (roomID, reason, errorCode, extendedData) {
+      if (roomID != _activeRoomID) return;
+      if (reason == ZegoRoomStateChangedReason.Logined || reason == ZegoRoomStateChangedReason.Reconnected) {
+        _joined = true;
+        status.value = 'Voice live';
+      } else if (reason == ZegoRoomStateChangedReason.Reconnecting || reason == ZegoRoomStateChangedReason.Logining) {
+        status.value = 'Menghubungkan voice…';
+      } else {
+        _joined = false;
+        status.value = 'Voice terputus · sambungkan ulang';
+      }
+    };
+
     ZegoExpressEngine.onRoomStreamUpdate =
         (roomID, updateType, streamList, extendedData) {
       // Queue stream events behind login; callbacks may arrive before its Future.
@@ -123,6 +138,14 @@ class _ZegoVoiceService {
       });
     };
 
+    ZegoExpressEngine.onPublisherStateUpdate = (streamID, state, errorCode, extendedData) {
+      if (streamID != _localStreamID) return;
+      if (state == ZegoPublisherState.NoPublish && errorCode != 0) {
+        _publishing = false;
+        status.value = 'Mic gagal terhubung · coba nyalakan ulang';
+      }
+    };
+
     _engineReady = true;
   }
 
@@ -142,13 +165,14 @@ class _ZegoVoiceService {
 
     if (_joined && _activeRoomID == safeRoom) return;
 
-    if (_joined) {
+    if (_activeRoomID != null) {
       await _leaveRoom();
     }
 
     // Set identity before login so early stream events belong to this room.
     _roomGeneration++;
     _activeRoomID = safeRoom;
+    status.value = 'Menghubungkan voice…';
     _localStreamID = _safeID(
       'room_${safeRoom}_user_${safeUser}',
       maxLength: 240,
@@ -165,6 +189,7 @@ class _ZegoVoiceService {
 
       _joined = true;
       _publishing = false;
+      status.value = 'Voice live';
     } catch (_) {
       await _leaveRoom();
       rethrow;
@@ -250,6 +275,7 @@ class _ZegoVoiceService {
     _joined = false;
     _activeRoomID = null;
     _localStreamID = null;
+    status.value = 'Voice belum terhubung';
   }
 }
 
@@ -1031,11 +1057,35 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int index = 0;
+  StreamSubscription<User?>? _authEconomy;
+  StreamSubscription<Map<String, dynamic>?>? _economy;
+  String? _economyUid;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentProfile();
+    _authEconomy = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _economyUid = user?.uid;
+      unawaited(_economy?.cancel());
+      coinBalance.value = 0;
+      diamondBalance.value = 0;
+      if (user == null) return;
+      final uid = user.uid;
+      _economy = EconomyService().watchEconomyData(uid).listen((data) {
+        if (!mounted || _economyUid != uid || FirebaseAuth.instance.currentUser?.uid != uid || data == null) return;
+        if (data['coin'] is num) coinBalance.value = (data['coin'] as num).toInt();
+        if (data['diamond'] is num) diamondBalance.value = (data['diamond'] as num).toInt();
+      }, onError: (Object error) { debugPrint('Economy stream failed: $error'); });
+    });
+  }
+
+  @override
+  void dispose() {
+    _economyUid = null;
+    _authEconomy?.cancel();
+    _economy?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCurrentProfile() async {
@@ -1077,18 +1127,7 @@ class _MainShellState extends State<MainShell> {
         fit: StackFit.expand,
         children: [
           const _LuxuryBackdrop(),
-          _RealtimeEconomyBuilder(
-            uid: FirebaseAuth.instance.currentUser?.uid ?? '',
-            builder: (context, economy) {
-              if (economy != null) {
-                final coin = economy['coin'] ?? economy['coins'] ?? economy['coinBalance'];
-                final diamond = economy['diamond'] ?? economy['diamonds'] ?? economy['diamondBalance'];
-                if (coin is num) coinBalance.value = coin.toInt();
-                if (diamond is num) diamondBalance.value = diamond.toInt();
-              }
-              return IndexedStack(index: index, children: pages);
-            },
-          ),
+          IndexedStack(index: index, children: pages),
         ],
       ),
       bottomNavigationBar: _BottomNav(
@@ -2622,6 +2661,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ..clear()
           ..addAll(members);
       });
+      if (_ZegoVoiceService.joined && (!foundMe || mySeat == null || !myMic)) {
+        _ZegoVoiceService.setMicrophoneEnabled(false).catchError((_) {});
+      }
+      if (!foundMe && _ZegoVoiceService.joined) {
+        _disconnectZegoVoice();
+      }
     });
 
     _eventSubscription = _RoomRealtimeService.room(roomId)
@@ -2682,6 +2727,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     try {
       await _RoomRealtimeService.joinRoom(roomId);
       await _RoomRealtimeService.heartbeat(roomId);
+      if (!mounted) return;
+      setState(() => _joined = true);
       await _connectZegoVoice();
       _heartbeatTimer = Timer.periodic(const Duration(seconds: 25), (_) {
         _RoomRealtimeService.heartbeat(roomId, seatIndex: _mySeatIndex).catchError((_) {});
@@ -2764,7 +2811,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     final next = !_micOn;
     if (_isRealtime) {
       try {
-        if (!_zegoJoined) {
+        if (!_zegoJoined || !_ZegoVoiceService.joined) {
           await _connectZegoVoice();
         }
 
@@ -3702,7 +3749,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     _roomToolTile(
                       icon: Icons.card_giftcard_rounded,
                       label: 'Lucky Bag',
-                      onTap: _showGifts,
+                      onTap: () {
+                        if (_isRealtime) {
+                          showLuckyBag(context, widget.roomId!);
+                        } else {
+                          _showMessage(context, 'Masuk room untuk membagikan Lucky Bag.');
+                        }
+                      },
                     ),
                     _roomToolTile(
                       icon: Icons.calendar_month_rounded,
@@ -4542,6 +4595,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       ('Queen Crown', Icons.diamond_rounded, 20000),
       ('Royal Castle', Icons.castle_rounded, 20000),
       ('Golden Wings', Icons.flutter_dash_rounded, 20000),
+      ('Royal Rose', Icons.local_florist_rounded, 100),
+      ('Royal Coffee', Icons.coffee_rounded, 500),
+      ('Royal Cake', Icons.cake_rounded, 1000),
+      ('Royal Heart', Icons.favorite_border_rounded, 5000),
+      ('Diamond Ring', Icons.diamond_outlined, 10000),
+      ('Golden Dragon', Icons.whatshot_rounded, 50000),
+      ('Royal Yacht', Icons.sailing_rounded, 100000),
+      ('Golden Palace', Icons.account_balance_rounded, 500000),
+      ('Kingdom Throne', Icons.chair_rounded, 1000000),
     ];
     const quantities = [1, 7, 77, 777, 7777];
 
@@ -4549,6 +4611,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     int quantity = 1;
     int selectedGift = 0;
     String category = 'Gift';
+    bool sending = false;
+    String? transactionId;
 
     showModalBottomSheet(
       context: context,
@@ -4613,7 +4677,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
-                          for (final tab in const ['Gift', 'CP', 'Lucky Gift', 'Flag', 'Exclusive'])
+                          for (final tab in const ['Gift'])
                             GestureDetector(
                               onTap: () => setSheetState(() => category = tab),
                               child: Padding(
@@ -4650,7 +4714,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                             icon: gift.$2,
                             cost: gift.$3,
                             active: active,
-                            onTap: () => setSheetState(() => selectedGift = index),
+                            onTap: () { if (transactionId == null) setSheetState(() => selectedGift = index); },
                           );
                         },
                       ),
@@ -4665,7 +4729,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         children: [
                           Expanded(
                             child: InkWell(
-                              onTap: () async {
+                              onTap: transactionId != null ? null : () async {
                                 final result = await showDialog<String>(
                                   context: sheetContext,
                                   builder: (_) => AlertDialog(
@@ -4719,7 +4783,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                 iconEnabledColor: Colors.white,
                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                                 items: [for (final q in quantities) DropdownMenuItem(value: q, child: Text('x$q'))],
-                                onChanged: (value) {
+                                onChanged: transactionId != null ? null : (value) {
                                   if (value != null) setSheetState(() => quantity = value);
                                 },
                               ),
@@ -4729,40 +4793,37 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           SizedBox(
                             height: 48,
                             child: FilledButton(
-                              onPressed: () async {
+                              onPressed: sending ? null : () async {
                                 if (coins < totalCost) {
                                   _showMessage(context, 'Coin tidak cukup. Butuh ${_formatCoins(totalCost)} Coin.');
                                   return;
                                 }
                                 if (_isRealtime) {
+                                  setSheetState(() => sending = true);
+                                  transactionId ??= FirebaseFirestore.instance.collection('giftTransactions').doc().id;
                                   try {
-                                    await _RoomRealtimeService.sendGift(
-                                      roomId: widget.roomId!,
-                                      targetName: target == 'Saya'
-                                          ? (AppProfileState.name.value.trim().isEmpty ? 'Saya' : AppProfileState.name.value.trim())
-                                          : target,
-                                      giftName: selected.$1,
-                                      coinCost: totalCost,
-                                      quantity: quantity,
-                                    );
-                                  } catch (_) {
-                                    if (mounted) _showMessage(context, 'Gift gagal dikirim ke room.');
+                                    await EconomyService().sendRoomGift(roomId: widget.roomId!, targetName: target,
+                                      giftName: selected.$1, quantity: quantity, transactionId: transactionId!);
+                                  } catch (error) {
+                                    if (sheetContext.mounted) setSheetState(() => sending = false);
+                                    if (mounted) _showMessage(context, 'Gift belum terkirim. Periksa koneksi dan layanan backend.');
                                     return;
                                   }
+                                } else {
+                                  _showMessage(context, 'Masuk room realtime untuk mengirim gift.');
+                                  return;
                                 }
-                                _setCoins(coins - totalCost);
                                 LevelProgressStore.add('Wealth', totalCost);
                                 final isSelfGift = target == 'Saya';
                                 if (isSelfGift) {
                                   LevelProgressStore.add('Charm', totalCost);
                                 }
-                                if (isSelfGift) _addDiamonds(totalCost);
                                 _giftTarget = target;
                                 if (!_isRealtime) {
                                   _addRoomEvent(_RoomEvent.gift('Saya', target, selected.$1, totalCost));
                                 }
                                 _addWalletTransaction(
-                                  'Gift ${selected.$1} x$quantity → $target -${_formatCoins(totalCost)} Coin${isSelfGift ? ' / +${_formatCoins(totalCost)} Diamond' : ''}',
+                                  'Gift ${selected.$1} x$quantity → $target -${_formatCoins(totalCost)} Coin',
                                 );
                                 if (sheetContext.mounted) Navigator.pop(sheetContext);
                                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -5078,6 +5139,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                   children: [
+                    if (_isRealtime) ...[
+                      ValueListenableBuilder<String>(valueListenable: _ZegoVoiceService.status,
+                        builder: (_, status, __) => TextButton.icon(
+                          onPressed: () async { await _connectZegoVoice(); },
+                          icon: Icon(status == 'Voice live' ? Icons.graphic_eq_rounded : Icons.sync_rounded, color: _roomGold, size: 16),
+                          label: Text(status, style: const TextStyle(color: _roomGold, fontSize: 11)),
+                        )),
+                      RoomLuckyBags(roomId: widget.roomId!),
+                    ],
                     const SizedBox(height: 4),
                     _SeatGrid(
                       seats: _seatNames,
