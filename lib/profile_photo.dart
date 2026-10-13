@@ -71,7 +71,7 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
   Widget build(BuildContext context) => Column(children: [
     InkWell(onTap: widget.busy ? null : gallery, borderRadius: BorderRadius.circular(60), child: CircleAvatar(
       radius: 54, backgroundColor: const Color(0xFFE7CD91),
-      backgroundImage: preview != null ? MemoryImage(preview!) : validProfilePhotoUrl(widget.url) ? NetworkImage(widget.url) : null,
+      backgroundImage: preview != null ? MemoryImage(preview!) as ImageProvider<Object> : validProfilePhotoUrl(widget.url) ? NetworkImage(widget.url) : null,
       child: preview == null && !validProfilePhotoUrl(widget.url) ? const Icon(Icons.add_a_photo_rounded, color: Color(0xFF684724), size: 36) : null,
     )), const SizedBox(height: 10),
     Wrap(spacing: 8, children: [
