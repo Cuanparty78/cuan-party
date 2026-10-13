@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cuan_party/room_visuals.dart';
 
 void main() {
-  testWidgets('announcement keeps full width and aligns right for short and long text', (tester) async {
+  testWidgets('announcement keeps full width and aligns left for short and long text', (tester) async {
     for (final text in ['WELCOME', 'Welcome everyone! Let us chat and have fun together.']) {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SizedBox(width: 320, child: RoomAnnouncement(text: text)))));
-      expect(tester.widget<Text>(find.text(text)).textAlign, TextAlign.right);
+      expect(tester.widget<Text>(find.text(text)).textAlign, TextAlign.left);
       expect(tester.getSize(find.byType(RoomAnnouncement)).width, 320);
     }
   });

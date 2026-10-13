@@ -22,7 +22,7 @@ class RoomAnnouncement extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: double.infinity, padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(color: Colors.black.withValues(alpha: .24), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: .1))),
-    child: Text(text, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFFFD66B), fontWeight: FontWeight.w800, height: 1.45)),
+    child: Text(text, textAlign: TextAlign.left, style: const TextStyle(color: Color(0xFFFFD66B), fontWeight: FontWeight.w800, height: 1.45)),
   );
 }
 

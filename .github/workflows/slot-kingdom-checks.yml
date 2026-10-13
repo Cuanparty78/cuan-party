@@ -22,5 +22,5 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze lib/slot_kingdom_page.dart lib/lucky_bag.dart lib/economy_service.dart lib/room_visuals.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
-      - run: flutter test test/lucky_bag_test.dart test/room_visuals_test.dart
+      - run: flutter analyze lib/slot_kingdom_page.dart lib/lucky_bag.dart lib/economy_service.dart lib/room_visuals.dart lib/room_chat_policy.dart lib/profile_photo.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
+      - run: flutter test test/lucky_bag_test.dart test/room_visuals_test.dart test/room_chat_policy_test.dart test/profile_photo_test.dart

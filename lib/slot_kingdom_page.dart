@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 Future<void> openSlotKingdom(BuildContext context, {required Future<void> Function() openWallet, bool inRoom = false}) async {
@@ -12,7 +14,7 @@ Future<void> openSlotKingdom(BuildContext context, {required Future<void> Functi
   }
   if (inRoom) {
     await showModalBottomSheet<void>(
-      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF063D36),
+      context: context, isScrollControlled: true, enableDrag: false, backgroundColor: const Color(0xFF063D36),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       clipBehavior: Clip.antiAlias,
       builder: (_) => SizedBox(height: MediaQuery.sizeOf(context).height * .72,
@@ -121,5 +123,7 @@ class _SlotKingdomPageState extends State<SlotKingdomPage> with WidgetsBindingOb
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(child: WebViewWidget(controller: _controller));
+  Widget build(BuildContext context) => SafeArea(child: WebViewWidget(controller: _controller,
+    gestureRecognizers: {Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer())},
+  ));
 }

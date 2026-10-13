@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,8 @@ import 'economy_service.dart';
 import 'slot_kingdom_page.dart';
 import 'lucky_bag.dart';
 import 'room_visuals.dart';
+import 'room_chat_policy.dart';
+import 'profile_photo.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 void main() => runApp(const CuanPartyApp());
@@ -326,13 +329,15 @@ class _RoomEvent {
   final String text;
   final String? to;
   final int coinCost;
+  final String? id;
+  final String? fromId;
 
-  const _RoomEvent.chat(this.from, this.text)
+  const _RoomEvent.chat(this.from, this.text, {this.id, this.fromId})
       : type = _RoomEventType.chat,
         to = null,
         coinCost = 0;
 
-  const _RoomEvent.gift(this.from, this.to, this.text, this.coinCost)
+  const _RoomEvent.gift(this.from, this.to, this.text, this.coinCost, {this.id, this.fromId})
       : type = _RoomEventType.gift;
 }
 
@@ -480,20 +485,16 @@ class _RoomRealtimeService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final roomRef = room(roomId);
-    final batch = _db.batch();
-    batch.set(
-      roomRef.collection('members').doc(user.uid),
-      <String, dynamic>{'lastSeen': FieldValue.serverTimestamp()},
-      SetOptions(merge: true),
-    );
-    if (seatIndex != null) {
-      batch.set(
-        roomRef.collection('seats').doc('$seatIndex'),
-        <String, dynamic>{'lastSeen': FieldValue.serverTimestamp()},
-        SetOptions(merge: true),
-      );
-    }
-    await batch.commit();
+    final memberRef = roomRef.collection('members').doc(user.uid);
+    await _db.runTransaction((tx) async {
+      final member = await tx.get(memberRef);
+      if (!member.exists) return; // A heartbeat must not undo a kick/leave.
+      final seatRef = seatIndex == null ? null : roomRef.collection('seats').doc('$seatIndex');
+      final seat = seatRef == null ? null : await tx.get(seatRef);
+      final identity = {'name': _displayName(user), 'photoUrl': AppProfileState.photoUrl.value, 'lastSeen': FieldValue.serverTimestamp()};
+      tx.update(memberRef, identity);
+      if (seatRef != null && seat?.data()?['uid'] == user.uid) tx.update(seatRef, identity);
+    });
   }
 
   static Future<void> leaveRoom(String roomId) async {
@@ -798,19 +799,38 @@ class _RoomRealtimeService {
     if (user == null) throw StateError('LOGIN_REQUIRED');
     final ref = room(roomId);
     final messageRef = ref.collection('messages').doc();
-    final batch = _db.batch();
-    batch.set(messageRef, <String, dynamic>{
-      'type': 'chat',
-      'fromId': user.uid,
-      'fromName': _displayName(user),
-      'text': text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
+    if (text.trim().isEmpty || text.trim().length > 1000) throw StateError('INVALID_COMMENT');
+    await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(ref), member = await tx.get(ref.collection('members').doc(user.uid));
+      final canModerate = RoomChatPolicy.moderator(uid: user.uid, ownerUid: '${roomSnap.data()?['ownerId'] ?? ''}', role: member.data()?['role']);
+      if (!roomSnap.exists || roomSnap.data()?['isActive'] == false || !RoomChatPolicy.canSend(open: roomSnap.data()?['chatEnabled'] != false, isMember: member.exists, isModerator: canModerate)) throw StateError('CHAT_CLOSED');
+      tx.set(messageRef, {'type': 'chat', 'fromId': user.uid, 'fromName': _displayName(user), 'text': text.trim(), 'createdAt': FieldValue.serverTimestamp()});
+      tx.update(ref, {'lastActivityAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
     });
-    batch.update(ref, <String, dynamic>{
-      'lastActivityAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+  }
+
+  static Future<void> setChatOpen(String roomId, bool open) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    await _db.runTransaction((tx) async {
+      final rs = await tx.get(ref), member = await tx.get(ref.collection('members').doc(user.uid));
+      if (!RoomChatPolicy.moderator(uid: user.uid, ownerUid: '${rs.data()?['ownerId'] ?? ''}', role: member.data()?['role'])) throw StateError('ADMIN_ONLY');
+      tx.update(ref, {'chatEnabled': open, 'updatedAt': FieldValue.serverTimestamp()});
     });
-    await batch.commit();
+  }
+
+  static Future<void> deleteChat(String roomId, String messageId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId), messageRef = room(roomId).collection('messages').doc(messageId);
+    await _db.runTransaction((tx) async {
+      final rs = await tx.get(ref), member = await tx.get(ref.collection('members').doc(user.uid)), message = await tx.get(messageRef);
+      if (!message.exists) return;
+      final canModerate = RoomChatPolicy.moderator(uid: user.uid, ownerUid: '${rs.data()?['ownerId'] ?? ''}', role: member.data()?['role']);
+      if (!RoomChatPolicy.canDelete(type: '${message.data()?['type'] ?? 'chat'}', isMember: member.exists, isModerator: canModerate, uid: user.uid, authorUid: '${message.data()?['fromId'] ?? ''}')) throw StateError('COMMENT_DELETE_DENIED');
+      tx.delete(messageRef);
+    });
   }
 
   static Future<void> sendGift({
@@ -1123,6 +1143,8 @@ class _MainShellState extends State<MainShell> {
         if (!mounted || _economyUid != uid || FirebaseAuth.instance.currentUser?.uid != uid || data == null) return;
         if (data['coin'] is num) coinBalance.value = (data['coin'] as num).toInt();
         if (data['diamond'] is num) diamondBalance.value = (data['diamond'] as num).toInt();
+        if (data['photoUrl'] is String) AppProfileState.photoUrl.value = data['photoUrl'];
+        if (data['displayName'] is String) AppProfileState.name.value = data['displayName'];
       }, onError: (Object error) { debugPrint('Economy stream failed: $error'); });
     });
   }
@@ -2761,7 +2783,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             data['coinCost'] is num ? (data['coinCost'] as num).toInt() : 0,
           ));
         } else {
-          events.add(_RoomEvent.chat(from, '${data['text'] ?? ''}'));
+          events.add(_RoomEvent.chat(from, '${data['text'] ?? ''}', id: doc.id, fromId: '${data['fromId'] ?? ''}'));
         }
       }
       roomEvents.value = events;
@@ -2971,20 +2993,21 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   Future<void> _sendMessage() async {
     final value = _messageController.text.trim();
     if (value.isEmpty) return;
-    if (!_chatEnabled && !_isOwner) {
+    if (!_chatEnabled && !_canManageSeats) {
       _showMessage(context, 'Obrolan sedang ditutup oleh owner.');
       return;
     }
-    _messageController.clear();
     if (_isRealtime) {
       try {
         await _RoomRealtimeService.sendChat(widget.roomId!, value);
-      } catch (_) {
-        if (mounted) _showMessage(context, 'Pesan gagal dikirim.');
+      } catch (error) {
+        if (mounted) _showMessage(context, '$error'.contains('CHAT_CLOSED') ? 'Chat ditutup. Hanya owner/admin yang dapat berkomentar.' : 'Pesan gagal dikirim.');
+        return;
       }
     } else {
       _addRoomEvent(_RoomEvent.chat('Saya', value));
     }
+    _messageController.clear();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -2994,6 +3017,18 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         );
       }
     });
+  }
+
+  Future<void> _deleteComment(_RoomEvent event) async {
+    if (!_isRealtime || event.id == null || event.type != _RoomEventType.chat) return;
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Hapus komentar?'), content: const Text('Komentar akan dihapus untuk semua pengguna di room.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Batal')),
+        FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Hapus'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try { await _RoomRealtimeService.deleteChat(widget.roomId!, event.id!); }
+    catch (_) { if (mounted) _showMessage(context, 'Komentar gagal dihapus. Periksa izin owner/admin.'); }
   }
 
   Future<void> _takeSeat(int index) async {
@@ -3681,9 +3716,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       icon: _chatEnabled
                           ? Icons.chat_bubble_outline_rounded
                           : Icons.comments_disabled_rounded,
-                      label: _chatEnabled ? 'Obrolan Buka' : 'Obrolan Tutup',
+                      label: _chatEnabled ? 'Tutup Chat' : 'Buka Chat',
                       onTap: () async {
-                        if (!_isOwner || !_isRealtime) {
+                        if (!_canManageSeats || !_isRealtime) {
                           Navigator.pop(sheetContext);
                           _showMessage(
                             context,
@@ -3694,10 +3729,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           return;
                         }
                         try {
-                          await _RoomRealtimeService.updateRoomDetails(
-                            widget.roomId!,
-                            chatEnabled: !_chatEnabled,
-                          );
+                          await _RoomRealtimeService.setChatOpen(widget.roomId!, !_chatEnabled);
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext);
                           }
@@ -5285,6 +5317,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       seatKeys: _seatKeys,
                       seatEmojis: _seatEmojis,
                       seatMicStates: _seatMicStates,
+                      seatPhotos: {for (final entry in _seatUids.entries)
+                        entry.key: '${_roomMembers[entry.value]?['photoUrl'] ?? ''}'},
                       lockedSeats: _lockedSeats,
                       onTap: (index) => _handleSeatTap(index),
                     ),
@@ -5325,7 +5359,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                     event.type == _RoomEventType.gift)))
                               Align(
                                 alignment: Alignment.centerLeft,
-                                child: _RoomEventBubble(event),
+                                child: GestureDetector(
+                                  onLongPress: event.type == _RoomEventType.chat && (_canManageSeats || event.fromId == FirebaseAuth.instance.currentUser?.uid)
+                                    ? () => _deleteComment(event) : null,
+                                  child: _RoomEventBubble(event),
+                                ),
                               ),
                           ],
                         );
@@ -5341,11 +5379,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     Expanded(
                       child: TextField(
                         controller: _messageController,
+                        enabled: _chatEnabled || _canManageSeats,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendMessage(),
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          hintText: 'Say Hi',
+                          hintText: _chatEnabled || _canManageSeats ? 'Say Hi' : 'Chat ditutup oleh admin',
                           hintStyle: TextStyle(color: Colors.white.withOpacity(.72)),
                           filled: true,
                           fillColor: Colors.black.withOpacity(.28),
@@ -5495,6 +5534,7 @@ class _SeatGrid extends StatelessWidget {
   final Map<int, String> seatEmojis;
   final Map<int, bool> seatMicStates;
   final Set<int> lockedSeats;
+  final Map<int, String> seatPhotos;
   final ValueChanged<int> onTap;
   const _SeatGrid({
     required this.seats,
@@ -5502,6 +5542,7 @@ class _SeatGrid extends StatelessWidget {
     required this.seatEmojis,
     this.seatMicStates = const <int, bool>{},
     this.lockedSeats = const <int>{},
+    this.seatPhotos = const <int, String>{},
     required this.onTap,
   });
 
@@ -5515,6 +5556,7 @@ class _SeatGrid extends StatelessWidget {
       itemBuilder: (_, index) {
         final name = seats[index];
         final emoji = seatEmojis[index];
+        final photo = seatPhotos[index] ?? '';
         return InkWell(
           key: seatKeys[index],
           borderRadius: BorderRadius.circular(20),
@@ -5534,7 +5576,9 @@ class _SeatGrid extends StatelessWidget {
                       border: Border.all(color: name == null ? Colors.white.withOpacity(.16) : _roomGold.withOpacity(.9), width: 1.5),
                       boxShadow: name != null ? [BoxShadow(color: _roomPurple.withOpacity(.55), blurRadius: 18)] : null,
                     ),
-                    child: name == null ? Icon(lockedSeats.contains(index) ? Icons.lock_rounded : Icons.add_rounded, color: _roomGold, size: 24) : const Icon(Icons.person_rounded, color: _roomGold, size: 29),
+                    child: name == null ? Icon(lockedSeats.contains(index) ? Icons.lock_rounded : Icons.add_rounded, color: _roomGold, size: 24)
+                      : validProfilePhotoUrl(photo) ? ClipOval(child: Image.network(photo, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: _roomGold, size: 29)))
+                      : const Icon(Icons.person_rounded, color: _roomGold, size: 29),
                   ),
                   if (emoji != null)
                     Container(
@@ -12627,6 +12671,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late final TextEditingController _bio;
 
   late String _gender;
+  late String _photoUrl;
+  Uint8List? _photoBytes;
+  String? _googlePhoto;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -12636,6 +12684,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _country = TextEditingController(text: AppProfileState.country.value);
     _bio = TextEditingController(text: AppProfileState.bio.value);
     _gender = AppProfileState.gender.value;
+    _photoUrl = AppProfileState.photoUrl.value;
+    for (final provider in FirebaseAuth.instance.currentUser?.providerData ?? <UserInfo>[]) {
+      if (provider.providerId == 'google.com') _googlePhoto = provider.photoURL;
+    }
   }
 
   @override
@@ -12654,16 +12706,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Center(
-            child: CircleAvatar(
-              radius: 54,
-              backgroundColor: _C.gold2,
-              child: const Icon(
-                Icons.person,
-                color: _C.brown,
-                size: 60,
-              ),
-            ),
+          ProfilePhotoPicker(url: _photoUrl, googleUrl: _googlePhoto, busy: _saving,
+            onBytes: (bytes) => _photoBytes = bytes,
+            onUrl: (url) => setState(() => _photoUrl = url),
           ),
           const SizedBox(height: 22),
           _editField('Nama', _name),
@@ -12675,7 +12720,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<String>(
-              value: _gender,
+              value: const ['Laki-laki', 'Perempuan'].contains(_gender) ? _gender : null,
               decoration: const InputDecoration(
                 labelText: 'Jenis Kelamin',
                 border: OutlineInputBorder(),
@@ -12690,7 +12735,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   child: Text('Perempuan'),
                 ),
               ],
-              onChanged: (value) {
+              onChanged: _saving ? null : (value) {
                 if (value != null) {
                   setState(() => _gender = value);
                 }
@@ -12711,7 +12756,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 backgroundColor: _C.brown,
                 foregroundColor: Colors.white,
               ),
-              onPressed: () async {
+              onPressed: _saving ? null : () async {
                 final newName = _name.text.trim();
                 if (newName.isEmpty) {
                   _showMessage(context, 'Nama tidak boleh kosong.');
@@ -12722,19 +12767,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   _showMessage(context, 'Sesi login tidak tersedia.');
                   return;
                 }
+                setState(() => _saving = true);
                 try {
                   final currentUser = FirebaseAuth.instance.currentUser;
+                  if (_photoBytes != null) _photoUrl = await uploadProfilePhoto(uid, _photoBytes!);
+                  if (FirebaseAuth.instance.currentUser?.uid != uid) throw StateError('Akun berubah saat menyimpan profil.');
                   await FirebaseFirestore.instance.collection('users').doc(uid).set({
                     'displayName': newName,
                     'age': _age.text.trim(),
                     'country': _country.text.trim(),
                     'bio': _bio.text.trim(),
                     'gender': _gender,
+                    'photoUrl': _photoUrl,
                     'updatedAt': FieldValue.serverTimestamp(),
                   }, SetOptions(merge: true));
 
                   if (currentUser != null && currentUser.displayName != newName) {
-                    await currentUser.updateDisplayName(newName);
+                    try { await currentUser.updateDisplayName(newName); } catch (_) {}
+                  }
+                  if (currentUser != null && validProfilePhotoUrl(_photoUrl)) {
+                    try { await currentUser.updatePhotoURL(_photoUrl); } catch (_) {}
                   }
 
                   AppProfileState.name.value = newName;
@@ -12742,6 +12794,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   AppProfileState.country.value = _country.text.trim();
                   AppProfileState.bio.value = _bio.text.trim();
                   AppProfileState.gender.value = _gender;
+                  AppProfileState.photoUrl.value = _photoUrl;
                   if (!mounted) return;
                   Navigator.pop(context);
                   _showMessage(context, 'Profil berhasil disimpan.');
@@ -12749,18 +12802,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   if (mounted) {
                     _showMessage(
                       context,
-                      'Gagal menyimpan profil: ${e.code}',
+                      e.plugin == 'firebase_storage' ? 'Upload foto gagal (${e.code}). Pastikan Storage dan izin upload aktif.' : 'Gagal menyimpan profil: ${e.code}',
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     _showMessage(context, 'Gagal menyimpan profil: $e');
                   }
+                } finally {
+                  if (mounted) setState(() => _saving = false);
                 }
               },
-              child: const Text(
-                'SAVE',
-                style: TextStyle(
+              child: Text(
+                _saving ? 'MENYIMPAN…' : 'SIMPAN',
+                style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1,
                 ),
@@ -12782,6 +12837,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: controller,
+        enabled: !_saving,
         keyboardType: keyboard,
         maxLines: maxLines,
         style: const TextStyle(color: _C.text, fontWeight: FontWeight.w700),
