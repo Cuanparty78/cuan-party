@@ -12,6 +12,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'economy_service.dart';
 import 'slot_kingdom_page.dart';
 import 'lucky_bag.dart';
+import 'room_visuals.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 void main() => runApp(const CuanPartyApp());
 
@@ -533,12 +535,18 @@ class _RoomRealtimeService {
     final targetSeatRef = roomRef.collection('seats').doc('$seatIndex');
 
     await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(roomRef);
       final memberSnap = await tx.get(memberRef);
       if (!memberSnap.exists) throw StateError('JOIN_FIRST');
+      final roomData = roomSnap.data() ?? const <String, dynamic>{};
+      if (!roomSnap.exists || roomData['isActive'] == false) throw StateError('ROOM_CLOSED');
+      final capacity = (roomData['capacity'] as num?)?.toInt() ?? 10;
+      if (seatIndex < 0 || seatIndex >= capacity) throw StateError('INVALID_SEAT');
+      if ((roomData['lockedSeats'] as List? ?? const []).contains(seatIndex)) throw StateError('SEAT_LOCKED');
       final targetSnap = await tx.get(targetSeatRef);
       if (targetSnap.exists) {
         final occupant = '${targetSnap.data()?['uid'] ?? ''}';
-        if (occupant != user.uid) throw StateError('SEAT_TAKEN');
+        if (occupant.isNotEmpty && occupant != user.uid) throw StateError('SEAT_TAKEN');
       }
       final memberData = memberSnap.data() ?? const <String, dynamic>{};
       final oldSeat = memberData['seatIndex'];
@@ -590,6 +598,43 @@ class _RoomRealtimeService {
       tx.update(roomRef, <String, dynamic>{
         'lastActivityAt': FieldValue.serverTimestamp(),
       });
+    });
+  }
+
+  static Future<void> setSeatLock(String roomId, int seatIndex, bool locked) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId);
+    await _db.runTransaction((tx) async {
+      final rs = await tx.get(ref), ms = await tx.get(ref.collection('members').doc(user.uid));
+      final seat = await tx.get(ref.collection('seats').doc('$seatIndex'));
+      if (rs.data()?['ownerId'] != user.uid && ms.data()?['role'] != 'admin') throw StateError('ADMIN_ONLY');
+      if (locked && '${seat.data()?['uid'] ?? ''}'.isNotEmpty) throw StateError('SEAT_TAKEN');
+      tx.update(ref, {'lockedSeats': locked ? FieldValue.arrayUnion([seatIndex]) : FieldValue.arrayRemove([seatIndex])});
+    });
+  }
+
+  static Future<void> inviteSeat(String roomId, int seatIndex, String targetUid) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId), target = room(roomId).collection('members').doc(targetUid);
+    await _db.runTransaction((tx) async {
+      final rs = await tx.get(ref), me = await tx.get(ref.collection('members').doc(user.uid));
+      final member = await tx.get(target), seat = await tx.get(ref.collection('seats').doc('$seatIndex'));
+      if (rs.data()?['ownerId'] != user.uid && me.data()?['role'] != 'admin') throw StateError('ADMIN_ONLY');
+      if (!member.exists || (rs.data()?['lockedSeats'] as List? ?? const []).contains(seatIndex) || '${seat.data()?['uid'] ?? ''}'.isNotEmpty) throw StateError('SEAT_UNAVAILABLE');
+      tx.update(target, {'seatInvite': {'seat': seatIndex, 'from': _displayName(user), 'id': ref.collection('messages').doc().id, 'expiresAt': DateTime.now().millisecondsSinceEpoch + 60000}});
+    });
+  }
+
+  static Future<void> sendSeatEmoji(String roomId, int index, String emoji) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('LOGIN_REQUIRED');
+    final ref = room(roomId).collection('seats').doc('$index');
+    await _db.runTransaction((tx) async {
+      final seat = await tx.get(ref);
+      if (seat.data()?['uid'] != user.uid) throw StateError('SEAT_REQUIRED');
+      tx.update(ref, {'emoji': emoji, 'emojiUntil': DateTime.now().millisecondsSinceEpoch + 5000});
     });
   }
 
@@ -663,6 +708,7 @@ class _RoomRealtimeService {
     String? password,
     String? coverUrl,
     bool? chatEnabled,
+    String? themeId,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw StateError('LOGIN_REQUIRED');
@@ -685,6 +731,7 @@ class _RoomRealtimeService {
     if (password != null) data['password'] = isPrivate == false ? '' : password.trim();
     if (coverUrl != null) data['coverUrl'] = coverUrl.trim();
     if (chatEnabled != null) data['chatEnabled'] = chatEnabled;
+    if (themeId != null) data['themeId'] = RoomThemePreset.fromId(themeId).id;
     await ref.update(data);
   }
 
@@ -2419,6 +2466,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   String _ownerId = '';
   String _roomCode = '';
   String _announcement = '';
+  String _themeId = 'purple';
+  final Set<int> _lockedSeats = {};
+  final Map<int, int> _seatEmojiUntil = {};
+  String? _lastSeatInvite;
   String _coverUrl = '';
   String _roomPassword = '';
   bool _roomPrivate = false;
@@ -2465,6 +2516,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   bool get _isRealtime => widget.roomId != null && widget.roomId!.isNotEmpty;
   bool get _isOwner => FirebaseAuth.instance.currentUser?.uid == _ownerId;
+  bool get _canManageSeats => _isOwner || _roomMembers[FirebaseAuth.instance.currentUser?.uid]?['role'] == 'admin';
 
   @override
   void initState() {
@@ -2576,6 +2628,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         _ownerId = '${data['ownerId'] ?? ''}';
         _roomCode = '${data['roomCode'] ?? ''}';
         _announcement = '${data['announcement'] ?? ''}';
+        _themeId = RoomThemePreset.fromId('${data['themeId'] ?? 'purple'}').id;
+        _lockedSeats..clear()..addAll((data['lockedSeats'] as List? ?? const []).whereType<num>().map((v) => v.toInt()));
         _coverUrl = '${data['coverUrl'] ?? ''}'.trim();
         _roomPassword = '${data['password'] ?? ''}';
         _roomPrivate = data['isPrivate'] == true;
@@ -2602,16 +2656,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       final names = _makeSeats(_capacity);
       final micStates = <int, bool>{};
       final seatUids = <int, String>{};
+      final emojis = <int, String>{};
+      final emojiUntil = <int, int>{};
       final myUid = FirebaseAuth.instance.currentUser?.uid;
       for (final doc in snapshot.docs) {
         final index = int.tryParse(doc.id);
         if (index == null || index < 0 || index >= names.length) continue;
         final data = doc.data();
         final uid = '${data['uid'] ?? ''}';
+        if (uid.isEmpty) continue;
         final name = '${data['name'] ?? 'User'}';
         names[index] = uid == myUid ? 'Saya' : name;
         micStates[index] = data['micOn'] == true;
         if (uid.isNotEmpty) seatUids[index] = uid;
+        final until = (data['emojiUntil'] as num?)?.toInt() ?? 0;
+        if (until > DateTime.now().millisecondsSinceEpoch && data['emoji'] is String) {
+          emojis[index] = data['emoji']; emojiUntil[index] = until;
+        }
       }
       setState(() {
         _seatNames = names;
@@ -2621,7 +2682,14 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         _seatUids
           ..clear()
           ..addAll(seatUids);
+        _seatEmojis..clear()..addAll(emojis);
+        _seatEmojiUntil..clear()..addAll(emojiUntil);
       });
+      for (final entry in emojiUntil.entries) {
+        Future.delayed(Duration(milliseconds: math.max(0, entry.value - DateTime.now().millisecondsSinceEpoch)), () {
+          if (mounted && _seatEmojiUntil[entry.key] == entry.value) setState(() { _seatEmojis.remove(entry.key); _seatEmojiUntil.remove(entry.key); });
+        });
+      }
     });
 
     _memberSubscription = _RoomRealtimeService.room(roomId)
@@ -2650,6 +2718,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           final seat = data['seatIndex'];
           mySeat = seat is num ? seat.toInt() : null;
           myMic = data['micOn'] == true;
+          final invite = data['seatInvite'];
+          if (invite is Map && invite['id'] is String && invite['id'] != _lastSeatInvite && (invite['expiresAt'] as num?) != null && (invite['expiresAt'] as num).toInt() > now.millisecondsSinceEpoch) {
+            _lastSeatInvite = invite['id'];
+            WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _acceptSeatInvite(Map<String, dynamic>.from(invite)); });
+          }
         }
       }
       setState(() {
@@ -2866,9 +2939,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             children: [
               for (final emoji in emojis)
                 InkWell(
-                  onTap: () {
+                  onTap: () async {
                     final seatIndex = _seatNames.indexOf('Saya');
                     if (seatIndex >= 0) {
+                      if (_isRealtime) {
+                        try { await _RoomRealtimeService.sendSeatEmoji(widget.roomId!, seatIndex, emoji); }
+                        catch (_) { if (mounted) _showMessage(context, 'Emoji gagal dikirim.'); }
+                        if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        return;
+                      }
                       setState(() => _seatEmojis[seatIndex] = emoji);
                       Future.delayed(const Duration(seconds: 5), () {
                         if (!mounted) return;
@@ -2918,6 +2997,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _takeSeat(int index) async {
+    if (index < 0 || index >= _capacity || _lockedSeats.contains(index)) {
+      _showMessage(context, 'Kursi sedang dikunci atau tidak tersedia.');
+      return;
+    }
     if (!_joined) {
       _showMessage(context, 'Masuk room dulu untuk mengambil seat.');
       return;
@@ -3074,7 +3157,38 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       _showMiniProfile(data);
       return;
     }
-    await _takeSeat(index);
+    await showModalBottomSheet<void>(context: context, backgroundColor: _C.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SeatActionMenu(number: index + 1, locked: _lockedSeats.contains(index), canManage: _canManageSeats,
+        onSeat: () { Navigator.pop(sheetContext); _takeSeat(index); },
+        onInvite: () { Navigator.pop(sheetContext); _inviteUserToSeat(index); },
+        onLock: () async {
+          Navigator.pop(sheetContext);
+          try { await _RoomRealtimeService.setSeatLock(widget.roomId!, index, !_lockedSeats.contains(index)); }
+          catch (_) { if (mounted) _showMessage(context, 'Kursi gagal diperbarui. Pastikan kursi kosong dan kamu owner/admin.'); }
+        },
+      ));
+  }
+
+  Future<void> _inviteUserToSeat(int index) async {
+    final uid = await showModalBottomSheet<String>(context: context, backgroundColor: _C.surface, builder: (sheetContext) => SafeArea(child: ListView(shrinkWrap: true, children: [
+      const ListTile(title: Text('Invite user', style: TextStyle(fontWeight: FontWeight.w900))),
+      for (final entry in _roomMembers.entries.where((e) => e.key != FirebaseAuth.instance.currentUser?.uid))
+        ListTile(leading: const Icon(Icons.person), title: Text('${entry.value['name'] ?? 'User'}'), subtitle: Text('ID ${entry.value['cuanId'] ?? entry.key}'), onTap: () => Navigator.pop(sheetContext, entry.key)),
+      if (_roomMembers.length <= 1) const ListTile(title: Text('Belum ada pengguna lain di room.')),
+    ])));
+    if (uid == null || !mounted) return;
+    try { await _RoomRealtimeService.inviteSeat(widget.roomId!, index, uid); if (mounted) _showMessage(context, 'Undangan kursi dikirim.'); }
+    catch (_) { if (mounted) _showMessage(context, 'Undangan gagal dikirim.'); }
+  }
+
+  Future<void> _acceptSeatInvite(Map<String, dynamic> invite) async {
+    if (invite['seat'] is! num || (invite['seat'] as num).toInt() < 0 || (invite['seat'] as num).toInt() >= _capacity) return;
+    final accept = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Undangan naik kursi'), content: Text('${invite['from']} mengundang kamu ke kursi No.${(invite['seat'] as num).toInt() + 1}.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Tolak')), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Terima'))],
+    ));
+    if (accept == true && mounted) await _takeSeat((invite['seat'] as num).toInt());
   }
 
   Widget _roomToolTile({
@@ -3805,6 +3919,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     var privateRoom = _roomPrivate;
     var selectedCapacity = _capacity;
     var coverUrl = _coverUrl;
+    var themeId = _themeId;
 
     showModalBottomSheet(
       context: context,
@@ -3934,6 +4049,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       () => selectedCapacity = value ?? selectedCapacity,
                     ),
                   ),
+                  const SizedBox(height: 18),
+                  const Text('Tema Room', style: TextStyle(color: _C.text, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final theme in RoomThemePreset.all) ChoiceChip(
+                      label: Text(theme.name), selected: themeId == theme.id,
+                      avatar: Container(width: 18, height: 18, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: theme.colors))),
+                      onSelected: (_) => setSheetState(() { themeId = theme.id; coverUrl = ''; }),
+                    ),
+                  ]),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: privateRoom,
@@ -4000,6 +4125,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                 ? passwordController.text.trim()
                                 : '',
                             coverUrl: coverUrl,
+                            themeId: themeId,
                           );
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext);
@@ -4806,7 +4932,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                       giftName: selected.$1, quantity: quantity, transactionId: transactionId!);
                                   } catch (error) {
                                     if (sheetContext.mounted) setSheetState(() => sending = false);
-                                    if (mounted) _showMessage(context, 'Gift belum terkirim. Periksa koneksi dan layanan backend.');
+                                    if (mounted) _showMessage(context,
+                                      error is FirebaseFunctionsException && error.code == 'not-found'
+                                        ? 'Layanan gift belum tersedia.'
+                                        : error is FirebaseFunctionsException
+                                          ? error.message ?? 'Gift gagal dikirim. Coba kembali.'
+                                          : 'Koneksi terputus. Coba kirim gift kembali.');
                                     return;
                                   }
                                 } else {
@@ -5002,10 +5133,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [_roomTop, _roomBottom],
+            colors: RoomThemePreset.fromId(_themeId).colors,
           ),
           image: _coverUrl.startsWith('http')
               ? DecorationImage(
@@ -5154,6 +5285,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       seatKeys: _seatKeys,
                       seatEmojis: _seatEmojis,
                       seatMicStates: _seatMicStates,
+                      lockedSeats: _lockedSeats,
                       onTap: (index) => _handleSeatTap(index),
                     ),
                     const SizedBox(height: 8),
@@ -5182,25 +5314,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(.24),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                    color: Colors.white.withOpacity(.08)),
-                              ),
-                              child: Text(
-                                _announcement.trim().isEmpty
-                                    ? "Welcome everyone! Let's chat and have fun together."
-                                    : _announcement,
-                                style: const TextStyle(
-                                  color: _roomGold,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
+                            RoomAnnouncement(text: _announcement.trim().isEmpty
+                              ? "Welcome everyone! Let's chat and have fun together." : _announcement),
                             const SizedBox(height: 10),
                             for (final event in events.where((event) =>
                                 _feedFilter == 'all' ||
@@ -5379,12 +5494,14 @@ class _SeatGrid extends StatelessWidget {
   final List<GlobalKey> seatKeys;
   final Map<int, String> seatEmojis;
   final Map<int, bool> seatMicStates;
+  final Set<int> lockedSeats;
   final ValueChanged<int> onTap;
   const _SeatGrid({
     required this.seats,
     required this.seatKeys,
     required this.seatEmojis,
     this.seatMicStates = const <int, bool>{},
+    this.lockedSeats = const <int>{},
     required this.onTap,
   });
 
@@ -5417,7 +5534,7 @@ class _SeatGrid extends StatelessWidget {
                       border: Border.all(color: name == null ? Colors.white.withOpacity(.16) : _roomGold.withOpacity(.9), width: 1.5),
                       boxShadow: name != null ? [BoxShadow(color: _roomPurple.withOpacity(.55), blurRadius: 18)] : null,
                     ),
-                    child: name == null ? const Icon(Icons.add_rounded, color: _roomGold, size: 24) : const Icon(Icons.person_rounded, color: _roomGold, size: 29),
+                    child: name == null ? Icon(lockedSeats.contains(index) ? Icons.lock_rounded : Icons.add_rounded, color: _roomGold, size: 24) : const Icon(Icons.person_rounded, color: _roomGold, size: 29),
                   ),
                   if (emoji != null)
                     Container(
@@ -5425,7 +5542,7 @@ class _SeatGrid extends StatelessWidget {
                       height: 52,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withOpacity(.16)),
-                      child: Text(emoji, style: const TextStyle(fontSize: 34)),
+                      child: AnimatedSeatEmoji(key: ValueKey('$index-$emoji'), emoji: emoji),
                     ),
                   if (name != null)
                     Positioned(
@@ -12030,10 +12147,20 @@ class InvitationPage extends StatelessWidget {
 class CustomerServicePage extends StatelessWidget {
   const CustomerServicePage({super.key});
 
-  void _enterRoom(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomDetailPage(
-      roomName: 'Customer Service', owner: 'CUAN PARTY', seats: 10,
-    )));
+  Future<void> _enterRoom(BuildContext context) async {
+    try {
+      final room = await FirebaseFirestore.instance.collection('rooms').doc('1001001').get();
+      if (!context.mounted) return;
+      if (!room.exists || room.data()?['isActive'] == false) {
+        _showMessage(context, 'Room Customer Service 1001001 belum dibuka.');
+        return;
+      }
+      final data = room.data()!;
+      Navigator.push(context, MaterialPageRoute(builder: (_) => RoomDetailPage(
+        roomId: room.id, roomName: '${data['name'] ?? 'Customer Service'}',
+        owner: '${data['ownerName'] ?? 'CUAN PARTY'}', seats: (data['capacity'] as num?)?.toInt() ?? 10,
+      )));
+    } catch (_) { if (context.mounted) _showMessage(context, 'Room Customer Service gagal dimuat.'); }
   }
 
   void _report(BuildContext context) {
