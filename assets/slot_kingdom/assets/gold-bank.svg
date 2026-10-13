@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 144">
+<defs><linearGradient id="gold" x2="0" y2="1"><stop stop-color="#fff0ab"/><stop offset=".4" stop-color="#e7b84f"/><stop offset="1" stop-color="#96641f"/></linearGradient><linearGradient id="emerald" x2="0" y2="1"><stop stop-color="#348861"/><stop offset="1" stop-color="#07382b"/></linearGradient><radialGradient id="coin"><stop stop-color="#fff5af"/><stop offset=".8" stop-color="#f5c450"/><stop offset="1" stop-color="#b27d29"/></radialGradient></defs>
+<ellipse cx="80" cy="132" rx="67" ry="9" fill="#001f1a" opacity=".45"/>
+<path d="M24 70V48Q80 9 136 48V70Z" fill="url(#emerald)" stroke="url(#gold)" stroke-width="6"/>
+<path d="M34 63V49Q80 22 126 49V63" fill="none" stroke="#e1b65a" stroke-width="3"/>
+<g stroke="#b67b24" stroke-width="2"><circle cx="50" cy="61" r="18" fill="url(#coin)"/><circle cx="108" cy="61" r="18" fill="url(#coin)"/><circle cx="79" cy="49" r="21" fill="url(#coin)"/><circle cx="79" cy="49" r="15" fill="none" stroke="#fff0a0"/></g>
+<path d="m69 48 4 4 6-10 6 10 4-4-3 12H72Z" fill="#bd8427"/>
+<path d="M18 67H142L135 122Q80 140 25 122Z" fill="url(#emerald)" stroke="url(#gold)" stroke-width="6"/>
+<path d="M20 76H140M32 69l7 58M128 69l-7 58" stroke="url(#gold)" stroke-width="7"/>
+<path d="M64 81h32v30H64Z" fill="url(#gold)" stroke="#fff0aa" stroke-width="2"/>
+<path d="m69 88 5 5 6-9 6 9 5-5-3 14H72Z" fill="#12583d"/>
+<circle cx="80" cy="107" r="3" fill="#0b3f2d"/>
+<g fill="#fff2b7"><path d="m17 31 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z"/><path d="m141 19 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z"/></g>
+</svg>

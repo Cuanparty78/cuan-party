@@ -1,0 +1,42 @@
+name: Deploy room gifts
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-room-gifts
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check backend
+        run: |
+          node --test functions/test/*.test.js
+          node --check functions/index.js
+      - name: Install deployment dependencies
+        run: |
+          npm install -g firebase-tools
+          npm install --prefix functions
+      - name: Prepare deployment credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -e
+          test -n "$FIREBASE_SERVICE_ACCOUNT"
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+      - name: Deploy gift callables
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+        run: >-
+          firebase deploy --only functions:sendGift,functions:sendRoomGift
+          --project cuan-party --non-interactive
+      - name: Remove temporary credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-service-account.json"

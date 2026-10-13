@@ -1,0 +1,44 @@
+name: Deploy SLOT KINGDOM backend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [Slot-kingdom]
+    paths: ['.github/workflows/deploy-slot-kingdom.yml']
+
+concurrency:
+  group: deploy-slot-kingdom
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test account settlement and UI
+        run: node --test functions/test/*.test.js
+      - name: Install Firebase CLI and dependencies
+        run: |
+          npm install -g firebase-tools
+          npm install --prefix functions
+      - name: Prepare deployment credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -e
+          test -n "$FIREBASE_SERVICE_ACCOUNT"
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+      - name: Deploy only SLOT KINGDOM callables
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+        run: >-
+          firebase deploy
+          --only functions:slotKingdomGetState,functions:slotKingdomSpin,functions:slotKingdomClaimGoldBank
+          --project cuan-party --non-interactive
+      - name: Remove temporary credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-service-account.json"
