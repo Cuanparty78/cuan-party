@@ -16,6 +16,7 @@ void main() {
     await tester.tap(find.text('5M'));
     await tester.tap(find.text('60'));
     await tester.tap(find.text('5'));
+    await tester.pump();
     await tester.tap(find.text('KIRIM 5M KOIN'));
     await tester.pumpAndSettle();
     expect(payloads.single['amount'], 5000000);
