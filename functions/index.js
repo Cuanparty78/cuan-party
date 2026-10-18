@@ -275,6 +275,21 @@ exports.claimVipCheckin = onCall(async (request) => {
     );
   }
 
+  // Reject arbitrary client dates (including future/past dates) so a user
+  // cannot repeatedly claim the daily reward by changing dateKey.
+  // CUAN PARTY's daily reset follows Indonesia time (WIB, UTC+7).
+  const dateParts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date()).filter((part) =>
+      ["year", "month", "day"].includes(part.type)
+    ).map((part) => [part.type, part.value]),
+  );
+  const todayJakarta = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+  if (dateKey !== todayJakarta) {
+    throw new HttpsError("failed-precondition", "Tanggal check-in harus hari ini (WIB).");
+  }
+
   const { userRef, economyRef } = refsFor(uid);
   const transactionRef = db
     .collection("economyTransactions")
