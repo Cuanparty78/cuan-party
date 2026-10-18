@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - Slot-kingdom
+      - spark-no-blaze
 
 jobs:
   build:
@@ -104,6 +105,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GIFT_WORKER_URL: ${{ vars.GIFT_WORKER_URL }}
 
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs=-Xmx4g
@@ -120,7 +122,8 @@ jobs:
 
             if flutter build apk --release \
               --dart-define=ZEGO_APP_ID="$ZEGO_APP_ID" \
-              --dart-define=ZEGO_APP_SIGN="$ZEGO_APP_SIGN"; then
+              --dart-define=ZEGO_APP_SIGN="$ZEGO_APP_SIGN" \
+              --dart-define=GIFT_WORKER_URL="$GIFT_WORKER_URL"; then
               echo "APK BUILD SUCCEEDED."
               exit 0
             fi
