@@ -365,6 +365,7 @@ exports.claimVipCheckin = onCall(async (request) => {
       userRef,
       {
         coin: newCoin,
+        vipLastCheckin: dateKey,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
