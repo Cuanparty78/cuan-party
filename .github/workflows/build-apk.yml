@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - Slot-kingdom
+      - cuan-party-fungsi-20261018
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -12,6 +16,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Apply CUAN PARTY functional economy fixes
+        run: |
+          python3 scripts/fix_economy_v1.py
+          node --check functions/index.js
+          git diff --stat
 
       - uses: actions/cache@v4
         with:
@@ -137,6 +147,18 @@ jobs:
 
       - name: Verify ZEGO native methods in release APK
         run: python3 scripts/verify_zego_apk.py build/app/outputs/flutter-apk/app-release.apk
+
+
+      - name: Save verified Flutter source in feature branch
+        if: github.ref == 'refs/heads/cuan-party-fungsi-20261018'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/luxury_app.dart
+          if ! git diff --cached --quiet; then
+            git commit -m "Use server verified VIP check-in and exchange; disable fake coin"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
