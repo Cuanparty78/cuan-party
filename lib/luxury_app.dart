@@ -905,11 +905,6 @@ void _addWalletTransaction(String text) {
   walletTransactions.value = [text, ...walletTransactions.value];
 }
 
-void _recharge(int coins) {
-  _addCoins(coins);
-  _addWalletTransaction('Isi Saldo +${_formatCoins(coins)} Coin');
-}
-
 class _C {
   static const bg = Color(0xFFE8D1A6);
   static const surface = Color(0xFFFFFBF4);
@@ -7185,7 +7180,7 @@ class _WalletPageState extends State<WalletPage> {
         backgroundColor: const Color(0xFFFFFBF3),
         title: const Text('Konfirmasi Top Up', style: TextStyle(color: Color(0xFF70451E), fontWeight: FontWeight.w800)),
         content: Text(
-          'Mode  akan menambahkan ${_formatCoins(amount)} Coin ke saldo.\\n\\nHarga: $price',
+          'Paket ${_formatCoins(amount)} Coin • $price. Pembayaran belum terhubung. Saldo hanya bertambah setelah diverifikasi oleh server.',
           style: const TextStyle(color: Color(0xFF6F5A43), height: 1.4),
         ),
         actions: [
@@ -7193,12 +7188,10 @@ class _WalletPageState extends State<WalletPage> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB87912)),
             onPressed: () {
-              _recharge(amount);
               Navigator.pop(dialogContext);
-              setState(() {});
-              _showMessage(context, '+${_formatCoins(amount)} Coin berhasil ditambahkan.');
+              _showMessage(context, 'Top Up belum tersedia. Saldo tidak berubah.');
             },
-            child: const Text('Top Up'),
+            child: const Text('Belum Tersedia'),
           ),
         ],
       ),
@@ -7578,6 +7571,7 @@ void _showRecharge(BuildContext context) {
 
 void _showExchange(BuildContext context) {
   final controller = TextEditingController();
+  bool exchanging = false;
 
   showDialog(
     context: context,
@@ -7633,7 +7627,7 @@ void _showExchange(BuildContext context) {
               child: const Text('Batal'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: exchanging ? null : () async {
                 final amount = int.tryParse(controller.text.replaceAll(',', '').trim()) ?? 0;
                 if (amount <= 0 || amount % 100 != 0) {
                   _showMessage(context, 'Jumlah Diamond harus kelipatan 100.');
@@ -7644,19 +7638,30 @@ void _showExchange(BuildContext context) {
                   return;
                 }
 
-                final coins = (amount * 70) ~/ 100;
-                _setDiamonds(diamondBalance.value - amount);
-                _addCoins(coins);
-                _addWalletTransaction(
-                  '-${_formatCoins(amount)} Diamond → +${_formatCoins(coins)} Coin',
-                );
-                Navigator.pop(dialogContext);
-                _showMessage(
-                  context,
-                  'Penukaran berhasil: -${_formatCoins(amount)} Diamond, +${_formatCoins(coins)} Coin.',
-                );
+                setState(() => exchanging = true);
+                try {
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid == null) throw StateError('LOGIN_REQUIRED');
+                  final result = await EconomyService().exchangeDiamondToCoin(
+                    diamond: amount,
+                    transactionId: 'exchange_${uid}_${DateTime.now().microsecondsSinceEpoch}',
+                  );
+                  final newCoin = result['coin'];
+                  final newDiamond = result['diamond'];
+                  if (newCoin is num) coinBalance.value = newCoin.toInt();
+                  if (newDiamond is num) diamondBalance.value = newDiamond.toInt();
+                  _addWalletTransaction('Exchange -${_formatCoins(amount)} Diamond');
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (context.mounted) _showMessage(context, 'Exchange berhasil di server.');
+                } catch (error) {
+                  if (dialogContext.mounted) setState(() => exchanging = false);
+                  if (context.mounted) _showMessage(context,
+                    error is FirebaseFunctionsException
+                      ? (error.message ?? 'Exchange gagal.')
+                      : 'Exchange gagal. Coba kembali.');
+                }
               },
-              child: const Text('Tukar Diamond'),
+              child: Text(exchanging ? 'Memproses...' : 'Tukar Diamond'),
             ),
           ],
         );
@@ -10863,13 +10868,7 @@ class _StorePageState extends State<StorePage> {
   }
 
   void _buyStoreItem(BuildContext context, String item, int price) {
-    if (coinBalance.value < price) {
-      _showMessage(context, 'Coin tidak cukup. Butuh ${_formatCoins(price)} Coin.');
-      return;
-    }
-    _setCoins(coinBalance.value - price);
-    _addWalletTransaction('Beli $item -${_formatCoins(price)} Coin');
-    _showMessage(context, '$item berhasil dibeli dan masuk Bag.');
+    _showMessage(context, 'Pembelian $item belum tersedia. Saldo tidak berubah.');
   }
 
   IconData _storeIcon(String value) {
@@ -11697,7 +11696,7 @@ class _VipDailyCheckinState extends State<_VipDailyCheckin> {
           ? rawVip.toInt().clamp(0, 10)
           : 0;
 
-      final today = DateTime.now();
+      final today = DateTime.now().toUtc().add(const Duration(hours: 7));
       final todayKey =
           '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
@@ -11814,88 +11813,32 @@ class _VipDailyCheckinState extends State<_VipDailyCheckin> {
 
   Future<void> _checkIn() async {
     if (_loading || _claimed || _ownedVip <= 0) return;
-
     setState(() => _loading = true);
-
     try {
-      final user = FirebaseAuth.instance.currentUser;
-
-      if (user == null) {
-        throw Exception('User belum login');
-      }
-
-      final ref = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid);
-
-      await FirebaseFirestore.instance.runTransaction(
-        (transaction) async {
-          final snapshot = await transaction.get(ref);
-          final data = snapshot.data() ?? {};
-
-          final rawVip = data['vip'];
-          final vip = rawVip is num
-              ? rawVip.toInt().clamp(0, 10)
-              : 0;
-
-          if (vip <= 0) {
-            throw Exception('Kamu belum memiliki VIP.');
-          }
-
-          final today = DateTime.now();
-          final todayKey =
-              '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
-          final lastCheckIn = data['vipLastCheckin'];
-
-          if (lastCheckIn == todayKey) {
-            throw Exception('Kamu sudah check-in hari ini.');
-          }
-
-          final reward = _checkinRewards[vip];
-
-          if (reward <= 0) {
-            throw Exception('Reward VIP tidak tersedia.');
-          }
-
-          final rawCoin = data['coin'];
-          final currentCoin = rawCoin is num
-              ? rawCoin.toInt()
-              : 0;
-
-          transaction.update(ref, {
-            'coin': currentCoin + reward,
-            'vipLastCheckin': todayKey,
-          });
-        },
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw StateError('LOGIN_REQUIRED');
+      final today = DateTime.now().toUtc().add(const Duration(hours: 7));
+      final dateKey = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      final result = await EconomyService().claimVipCheckin(
+        dateKey: dateKey,
+        transactionId: 'vipcheckin_${uid}_${DateTime.now().microsecondsSinceEpoch}',
       );
-
       if (!mounted) return;
-
-      setState(() {
-        _claimed = true;
-        _loading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Check-in berhasil! +${_formatCoins(_reward)} Coin',
-          ),
-        ),
-      );
-    } catch (e) {
+      final serverCoin = result['coin'];
+      if (serverCoin is num) coinBalance.value = serverCoin.toInt();
+      setState(() { _claimed = true; _loading = false; });
+      final reward = result['reward'];
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Check-in berhasil! +${_formatCoins(reward is num ? reward.toInt() : _reward)} Coin'),
+      ));
+    } catch (error) {
       if (!mounted) return;
-
       setState(() => _loading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error is FirebaseFunctionsException
+          ? (error.message ?? 'Check-in gagal.')
+          : 'Check-in gagal. Coba lagi.'),
+      ));
     }
   }
 }
