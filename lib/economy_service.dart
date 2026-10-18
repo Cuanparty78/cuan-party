@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
@@ -102,8 +105,72 @@ class EconomyService {
     return Map<String, dynamic>.from(result.data as Map);
   }
 
+  static const String _freeGiftWorkerUrl =
+      String.fromEnvironment('CUAN_GIFT_WORKER_URL');
+
+  /// When a free-tier worker URL is configured, use the trusted Worker to
+  /// settle the gift transaction. No client-side coin minting is allowed.
+  Future<Map<String, dynamic>> _sendGiftUsingWorker({
+    required String roomId,
+    required String targetName,
+    required String giftName,
+    required int quantity,
+    required String transactionId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Login dahulu untuk mengirim gift.');
+    }
+    final endpoint = Uri.parse(
+      '${_freeGiftWorkerUrl.replaceAll(RegExp(r"/+$"), "")}/gift/send',
+    );
+    if (endpoint.scheme != 'https') {
+      throw StateError('Server gift harus menggunakan HTTPS.');
+    }
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('Sesi login sudah habis, silakan login ulang.');
+    }
+    final response = await http
+        .post(
+          endpoint,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'roomId': roomId,
+            'targetName': targetName,
+            'giftName': giftName,
+            'quantity': quantity,
+            'transactionId': transactionId,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+    final dynamic payload;
+    try {
+      payload = jsonDecode(response.body);
+    } on FormatException {
+      throw StateError('Respons server gift tidak valid.');
+    }
+    if (payload is! Map) {
+      throw StateError('Respons server gift tidak valid.');
+    }
+    final data = Map<String, dynamic>.from(payload);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(data['error']?.toString() ?? 'Gift gagal dikirim.');
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> sendRoomGift({required String roomId, required String targetName,
     required String giftName, required int quantity, required String transactionId}) async {
+    if (_freeGiftWorkerUrl.trim().isNotEmpty) {
+      return _sendGiftUsingWorker(
+        roomId: roomId, targetName: targetName, giftName: giftName,
+        quantity: quantity, transactionId: transactionId,
+      );
+    }
     final result = await _functions.httpsCallable('sendRoomGift').call({
       'roomId': roomId, 'targetName': targetName, 'giftName': giftName,
       'quantity': quantity, 'transactionId': transactionId,
