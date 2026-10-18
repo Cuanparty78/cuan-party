@@ -1,0 +1,19 @@
+name: CUAN source inspection
+on:
+  workflow_dispatch:
+  push:
+    branches: [Slot-kingdom]
+    paths:
+      - .github/workflows/cuan-source-export.yml
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cuan-source-inspection
+          path: |
+            lib/luxury_app.dart
+            functions/index.js
+          if-no-files-found: error

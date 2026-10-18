@@ -5,6 +5,79 @@ class UserService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const int _startingCuanId = 1000110;
 
+  /// Registers a user atomically: a single account keeps its original ID.
+  /// Registration never resets a previously funded wallet.
+  static Future<String> completeRegistration({
+    required User user,
+    required String displayName,
+    required String photoUrl,
+    required DateTime birthDate,
+    required String gender,
+    required String country,
+    required String inviteCode,
+  }) async {
+    final userRef = _db.collection('users').doc(user.uid);
+    final counterRef = _db.collection('meta').doc('cuan_id_counter');
+    return _db.runTransaction<String>((tx) async {
+      final snapshot = await tx.get(userRef);
+      final old = snapshot.data() ?? <String, dynamic>{};
+      var cuanId = '${old['cuanId'] ?? ''}'.trim();
+
+      if (old['registrationComplete'] == true) {
+        if (!RegExp(r'^[0-9]+$').hasMatch(cuanId)) {
+          throw StateError('ACCOUNT_ID_INVALID');
+        }
+        return cuanId;
+      }
+
+      if (cuanId.isEmpty) {
+        final counter = await tx.get(counterRef);
+        final stored = counter.data()?['nextCuanId'];
+        var next = stored is int && stored >= _startingCuanId
+            ? stored
+            : _startingCuanId;
+        while (_hasTripleRepeatedDigits(next)) {
+          next++;
+        }
+        cuanId = next.toString();
+        tx.set(counterRef, {
+          'nextCuanId': next + 1,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else if (!RegExp(r'^[0-9]+$').hasMatch(cuanId)) {
+        throw StateError('ACCOUNT_ID_INVALID');
+      }
+
+      final patch = <String, dynamic>{
+        'cuanId': cuanId,
+        'displayName': displayName.trim(),
+        'email': user.email ?? '',
+        'photoUrl': photoUrl,
+        'birthDate': Timestamp.fromDate(birthDate),
+        'gender': gender,
+        'country': country,
+        'inviteCode': inviteCode.trim(),
+        'registrationComplete': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (old['createdAt'] == null)
+          'createdAt': FieldValue.serverTimestamp(),
+        if (old['coin'] == null) 'coin': 0,
+        if (old['diamond'] == null) 'diamond': 0,
+        if (old['level'] == null) 'level': 1,
+        if (old['wealthLevel'] == null) 'wealthLevel': 1,
+        if (old['charmLevel'] == null) 'charmLevel': 1,
+        if (old['gameLevel'] == null) 'gameLevel': 1,
+        if (old['vip'] == null) 'vip': 0,
+        if (old['svip'] == null) 'svip': 0,
+        if (old['svipPoints'] == null) 'svipPoints': 0,
+        if (old['frame'] == null) 'frame': 'default',
+        if (old['badge'] == null) 'badge': 'default',
+      };
+      tx.set(userRef, patch, SetOptions(merge: true));
+      return cuanId;
+    });
+  }
+
   /// Creates a new profile or repairs only missing core fields on an existing profile.
   /// Existing user data is preserved.
   static Future<void> ensureUserProfile(User user) async {

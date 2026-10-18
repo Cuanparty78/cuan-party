@@ -1,0 +1,40 @@
+name: Apply CUAN PARTY coin pricing
+on:
+  push:
+    branches: [Slot-kingdom]
+    paths:
+      - 'scripts/apply_coin_pricing.py'
+      - '.github/workflows/apply-coin-pricing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Patch source
+        run: python3 scripts/apply_coin_pricing.py
+      - name: Check diff
+        run: git diff --check
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter dependencies
+        run: flutter pub get
+      - name: Analyze changed code
+        run: flutter analyze lib/luxury_app.dart lib/coin_packages.dart --no-fatal-infos --no-fatal-warnings
+      - name: Test prices
+        run: flutter test test/coin_packages_test.dart
+      - name: Commit tested UI fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/luxury_app.dart
+          git diff --cached --quiet || git commit -m "Apply CUAN PARTY coin prices; disable fake topup"
+          git push origin HEAD:Slot-kingdom

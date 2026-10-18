@@ -441,81 +441,16 @@ class _RegistrationScreenState
     });
 
     try {
-      final db = FirebaseFirestore.instance;
-
-      final ref = db
-          .collection('users')
-          .doc(widget.user.uid);
-
-      final existing = await ref.get();
-      final existingData = existing.data();
-
-      // ============================================================
-      // CUAN ID
-      // ============================================================
-
-      String cuanId =
-          '${existingData?['cuanId'] ?? ''}'.trim();
-
-      if (cuanId.isEmpty) {
-        cuanId =
-            (await UserService.allocateCuanId())
-                .toString();
-      }
-
-      // ============================================================
-      // REGISTRATION DATA
-      // ============================================================
-
-      await ref.set(
-        {
-          'cuanId': cuanId,
-
-          'displayName': name,
-
-          'email': widget.user.email ?? '',
-
-          // Foto langsung dari Google.
-          'photoUrl': photoUrl,
-
-          'birthDate':
-              Timestamp.fromDate(_birthDate!),
-
-          'gender': _gender,
-
-          'country': _country,
-
-          // Optional.
-          'inviteCode':
-              _invite.text.trim(),
-
-          'registrationComplete': true,
-
-          // ========================================================
-          // DEFAULT ACCOUNT
-          // ========================================================
-
-          'coin': 0,
-          'diamond': 0,
-
-          'level': 1,
-
-          'vip': 0,
-
-          'svip': 0,
-          'svipPoints': 0,
-
-          'frame': 'default',
-          'badge': 'default',
-
-          'createdAt':
-              existingData?['createdAt'] ??
-              FieldValue.serverTimestamp(),
-
-          'updatedAt':
-              FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
+      // Register once, in the same Firestore transaction that allocates the
+      // permanent public account/room ID. Never reset existing balances.
+      await UserService.completeRegistration(
+        user: widget.user,
+        displayName: name,
+        photoUrl: photoUrl,
+        birthDate: _birthDate!,
+        gender: _gender!,
+        country: _country,
+        inviteCode: _invite.text.trim(),
       );
 
       // Update nama di Firebase Authentication.

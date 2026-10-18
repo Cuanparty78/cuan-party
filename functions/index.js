@@ -46,6 +46,16 @@ const GIFT_CATALOG = Object.freeze({
   royal_car: { name: "Royal Car", price: 20000 },
   queen_crown: { name: "Queen Crown", price: 20000 },
   golden_wings_alt: { name: "Golden Wings", price: 20000 },
+  royal_castle: { name: "Royal Castle", price: 20000 },
+  rose: { name: "Royal Rose", price: 100 },
+  coffee: { name: "Royal Coffee", price: 500 },
+  cake: { name: "Royal Cake", price: 1000 },
+  heart: { name: "Royal Heart", price: 5000 },
+  ring: { name: "Diamond Ring", price: 10000 },
+  dragon: { name: "Golden Dragon", price: 50000 },
+  yacht: { name: "Royal Yacht", price: 100000 },
+  palace: { name: "Golden Palace", price: 500000 },
+  throne: { name: "Kingdom Throne", price: 1000000 },
 });
 
 function requireAuth(request) {
@@ -858,3 +868,10 @@ exports.sendRoomGift = onCall(async (request) => {
     return result;
   });
 });
+
+Object.assign(exports, require('./slot_kingdom').install({
+  db, onCall, HttpsError, requireAuth, economyFrom, FieldValue,
+}));
+Object.assign(exports, require('./lucky_bag').install({
+  db, onCall, HttpsError, requireAuth, economyFrom, FieldValue,
+}));

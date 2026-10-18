@@ -1,0 +1,26 @@
+name: SLOT KINGDOM integration checks
+on:
+  pull_request:
+    paths: ['functions/**', 'assets/slot_kingdom/**', 'lib/**', 'test/**', 'pubspec.yaml', '.github/workflows/slot-kingdom-checks.yml']
+  workflow_dispatch:
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --test functions/test/*.test.js
+      - run: find functions assets/slot_kingdom -name '*.js' -print0 | xargs -0 -n1 node --check
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze lib/slot_kingdom_page.dart lib/lucky_bag.dart lib/economy_service.dart lib/room_visuals.dart lib/room_chat_policy.dart lib/profile_photo.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
+      - run: flutter test test/lucky_bag_test.dart test/room_visuals_test.dart test/room_chat_policy_test.dart test/profile_photo_test.dart
