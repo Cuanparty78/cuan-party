@@ -7,6 +7,9 @@ from pathlib import Path
 
 path = Path("lib/luxury_app.dart")
 src = path.read_text(encoding="utf-8")
+if "_recharge(amount)" not in src and "EconomyService().claimVipCheckin(" in src and "Top Up belum tersedia. Saldo tidak berubah." in src:
+    print("CUAN PARTY client economy fixes already applied.")
+    raise SystemExit(0)
 changes = []
 
 def exact(old: str, new: str, reason: str):
