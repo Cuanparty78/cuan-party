@@ -53,6 +53,12 @@ jobs:
           echo "flutter pub get failed after 3 attempts."
           exit 1
 
+      - name: Enable readable Spark gift backend errors
+        if: github.ref_name == 'spark-no-blaze'
+        run: |
+          python3 scripts/apply_no_blaze_gift_ui.py
+          flutter analyze lib/economy_service.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
+
       - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
