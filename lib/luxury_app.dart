@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'coin_packages.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -903,11 +904,6 @@ final ValueNotifier<List<String>> walletTransactions = ValueNotifier<List<String
 
 void _addWalletTransaction(String text) {
   walletTransactions.value = [text, ...walletTransactions.value];
-}
-
-void _recharge(int coins) {
-  _addCoins(coins);
-  _addWalletTransaction('Isi Saldo +${_formatCoins(coins)} Coin');
 }
 
 class _C {
@@ -4966,7 +4962,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                     if (sheetContext.mounted) setSheetState(() => sending = false);
                                     if (mounted) _showMessage(context,
                                       error is FirebaseFunctionsException && error.code == 'not-found'
-                                        ? 'Layanan gift belum tersedia.'
+                                        ? 'Pengiriman gift membutuhkan Firebase Cloud Functions aktif. Coin tidak dipotong.'
                                         : error is FirebaseFunctionsException
                                           ? error.message ?? 'Gift gagal dikirim. Coba kembali.'
                                           : 'Koneksi terputus. Coba kirim gift kembali.');
@@ -6835,14 +6831,7 @@ class _WalletPageState extends State<WalletPage> {
   int _tab = 0;
   final _exchangeController = TextEditingController();
 
-  final List<Map<String, String>> _packages = const [
-    {'coins': '1,000,000', 'amount': '1000000', 'price': 'Rp 18.000'},
-    {'coins': '5,000,000', 'amount': '5000000', 'price': 'Rp 90.000'},
-    {'coins': '10,000,000', 'amount': '10000000', 'price': 'Rp 180.000'},
-    {'coins': '20,000,000', 'amount': '20000000', 'price': 'Rp 360.000', 'tag': 'Popular'},
-    {'coins': '50,000,000', 'amount': '50000000', 'price': 'Rp 900.000'},
-    {'coins': '100,000,000', 'amount': '100000000', 'price': 'Rp 1.800.000', 'tag': 'Best Seller'},
-  ];
+  final List<Map<String, String>> _packages = CoinPackages.options;
 
   @override
   void dispose() {
@@ -7070,7 +7059,7 @@ class _WalletPageState extends State<WalletPage> {
                   children: [
                     Icon(Icons.verified_rounded, size: 17, color: Color(0xFFB87912)),
                     SizedBox(width: 5),
-                    Text('Aktif', style: TextStyle(color: Color(0xFF8A6231), fontSize: 11, fontWeight: FontWeight.w700)),
+                    Text('Harga Resmi', style: TextStyle(color: Color(0xFF8A6231), fontSize: 11, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
@@ -7179,26 +7168,24 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   void _confirmTopUp(int amount, String price) {
-    showDialog(
+    // A paid wallet can never be credited by client-side confirmation.
+    showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFFFFFBF3),
-        title: const Text('Konfirmasi Top Up', style: TextStyle(color: Color(0xFF70451E), fontWeight: FontWeight.w800)),
+        title: const Text('Paket Coin CUAN PARTY',
+          style: TextStyle(color: Color(0xFF70451E), fontWeight: FontWeight.w800)),
         content: Text(
-          'Mode  akan menambahkan ${_formatCoins(amount)} Coin ke saldo.\\n\\nHarga: $price',
+          'Jumlah: ${_formatCoins(amount)} Coin\nHarga: $price\n\n'
+          'Pembayaran belum diaktifkan. Coin baru ditambahkan '
+          'setelah pembayaran diverifikasi oleh server.',
           style: const TextStyle(color: Color(0xFF6F5A43), height: 1.4),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Batal')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB87912)),
-            onPressed: () {
-              _recharge(amount);
-              Navigator.pop(dialogContext);
-              setState(() {});
-              _showMessage(context, '+${_formatCoins(amount)} Coin berhasil ditambahkan.');
-            },
-            child: const Text('Top Up'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Mengerti'),
           ),
         ],
       ),
