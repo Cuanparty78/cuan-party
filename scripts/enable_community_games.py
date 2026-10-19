@@ -50,5 +50,25 @@ new="""                child: Center(child: Container(
                 )),"""
 assert s.count(old)==1
 s=s.replace(old,new,1)
+# Replace broken in-room SDK placeholders with actually playable free games.
+room_start=s.index("                    _roomToolTile(\n                      icon: Icons.casino_rounded,\n                      label: 'SLOT KINGDOM',")
+room_end=s.index("                    _roomToolTile(\n                      icon: Icons.leaderboard_rounded,",room_start)
+room_games="""                    for (final game in const [
+                      ('XO Party', Icons.grid_3x3_rounded),
+                      ('Dadu Party', Icons.casino_rounded),
+                      ('Memory Match', Icons.extension_rounded),
+                    ])
+                      _roomToolTile(
+                        icon: game.$2,
+                        label: game.$1,
+                        highlighted: true,
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => PartyMiniGamesPage(initialGame: game.$1)));
+                        },
+                      ),
+"""
+s=s[:room_start]+room_games+s[room_end:]
 p.write_text(s)
 print("Games and gift card visuals patched")
