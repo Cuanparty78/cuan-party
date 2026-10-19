@@ -1,0 +1,46 @@
+name: Authorize CUAN PARTY workspace login
+on:
+  push:
+    branches: [cuan-party-community-v1]
+    paths:
+      - .github/workflows/authorize-workspace.yml
+  workflow_dispatch:
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-save google-auth-library@9
+      - name: Load Firebase credentials privately
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT" || exit 1
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase.json"
+      - name: Add only the Railway workspace login domain
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase.json
+        run: |
+          node - <<'NODE'
+          const {GoogleAuth}=require('google-auth-library');
+          (async()=>{
+            const auth=new GoogleAuth({scopes:['https://www.googleapis.com/auth/cloud-platform']});
+            const client=await auth.getClient();
+            const url='https://identitytoolkit.googleapis.com/admin/v2/projects/cuan-party/config';
+            const get=await client.request({url});
+            const domain='cuan-workspace-api-production.up.railway.app';
+            const list=get.data.authorizedDomains||[];
+            if(list.includes(domain)){console.log('Domain already authorized');return;}
+            if(list.length>95)throw Error('Authorized domain list near limit');
+            const next=[...new Set([...list,domain])];
+            await client.request({url:url+'?updateMask=authorizedDomains',method:'PATCH',data:{authorizedDomains:next}});
+            console.log('Workspace domain authorized, old domains retained');
+          })().catch(e=>{console.error('Auth domain update failed:',e.response?.status||e.message);process.exit(1)})
+          NODE
+      - name: Delete temporary credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase.json"
