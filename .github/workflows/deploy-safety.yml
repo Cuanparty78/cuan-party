@@ -1,0 +1,114 @@
+name: Secure CUAN PARTY economy rules
+on:
+  push:
+    branches: [cuan-party-community-v1]
+    paths:
+      - .github/workflows/deploy-safety.yml
+  workflow_dispatch:
+jobs:
+  secure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install tooling
+        run: |
+          npm install --no-save google-auth-library@9
+          npm install -g firebase-tools
+      - name: Prepare credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT" || exit 1
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase.json"
+      - name: Fetch and harden current rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase.json
+        run: |
+          node - <<'NODE'
+          const {GoogleAuth}=require('google-auth-library');
+          const fs=require('fs');
+          (async()=>{
+            const auth=new GoogleAuth({scopes:['https://www.googleapis.com/auth/cloud-platform']});
+            const client=await auth.getClient();
+            const base='https://firebaserules.googleapis.com/v1/';
+            const rel=await client.request({url:base+'projects/cuan-party/releases/cloud.firestore'});
+            const rs=await client.request({url:base+rel.data.rulesetName});
+            const file=rs.data.source?.files?.find(f=>f.name==='firestore.rules')||rs.data.source?.files?.[0];
+            if(!file?.content)throw Error('Live Firestore rules missing');
+            fs.writeFileSync('firestore-live-before.rules',file.content);
+          })().catch(e=>{console.error('Rules fetch failed:',e.response?.status||e.message);process.exit(1)})
+          NODE
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('firestore-live-before.rules').read_text()
+          a='''    match /users/{userId} {\n'''
+          assert s.count(a)==1
+          # Private economy can be observed only by its owner. Nobody may write
+          # server-authoritative balances or VIP state directly from the app.
+          b='''    match /users/{userId} {
+              match /private/{docId} {
+                allow read: if isOwner(userId);
+                allow write: if false;
+              }
+'''
+          s=s.replace(a,b,1)
+          a="""      allow update: if signedIn()
+        && (
+          resource.data.ownerId == request.auth.uid"""
+          b="""      allow update: if signedIn()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['giftTotal'])
+        && (
+          resource.data.ownerId == request.auth.uid"""
+          assert s.count(a)==1
+          s=s.replace(a,b,1)
+          a="""              'updatedAt',
+              'giftTotal'
+"""
+          b="""              'updatedAt'
+"""
+          assert s.count(a)==1
+          s=s.replace(a,b,1)
+          a="""        allow create: if signedIn()
+          && request.resource.data.fromId == request.auth.uid;"""
+          b="""        allow create: if signedIn()
+          && request.resource.data.type == 'chat'
+          && request.resource.data.fromId == request.auth.uid;"""
+          assert s.count(a)==1
+          s=s.replace(a,b,1)
+          needle='''    // ==========================================================
+    // CUAN ID COUNTER'''
+          assert s.count(needle)==1
+          s=s.replace(needle,'''    // All coin seller roles and economy audit records are server-only.
+    match /coinSellers/{sellerId} {
+      allow read, write: if false;
+    }
+    match /economyTransactions/{txId} {
+      allow read, write: if false;
+    }
+    match /giftTransactions/{txId} {
+      allow read, write: if false;
+    }
+
+'''+needle,1)
+          Path('firestore-launch.rules').write_text(s)
+          Path('firebase.safety.json').write_text('{"firestore":{"rules":"firestore-launch.rules"}}')
+          print('Prepared minimally restricted existing rules. User coin writes remain denied.')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cuan-firestore-security-backup-and-patch
+          path: |
+            firestore-live-before.rules
+            firestore-launch.rules
+          if-no-files-found: error
+      - name: Deploy Firestore rules (Spark compatible)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase.json
+        run: firebase deploy --only firestore:rules --config firebase.safety.json --project cuan-party --non-interactive
+      - name: Clear credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase.json"
