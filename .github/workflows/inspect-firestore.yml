@@ -1,0 +1,53 @@
+name: Inspect Firestore security rules (read only)
+on:
+  push:
+    branches: [cuan-party-community-v1]
+    paths:
+      - .github/workflows/inspect-firestore.yml
+  workflow_dispatch:
+jobs:
+  read-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Google auth
+        run: npm install --no-save google-auth-library@9
+      - name: Prepare Firebase service account
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT" || { echo "FIREBASE_SERVICE_ACCOUNT not configured"; exit 1; }
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase.json"
+      - name: Retrieve currently deployed rules only
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase.json
+        run: |
+          node - <<'NODE'
+          const { GoogleAuth } = require('google-auth-library');
+          const fs = require('fs');
+          (async () => {
+            const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+            const client = await auth.getClient();
+            const base = 'https://firebaserules.googleapis.com/v1/projects/cuan-party';
+            const release = await client.request({url:base + '/releases/cloud.firestore'});
+            const name = release.data.rulesetName;
+            if (!name || !name.startsWith('projects/cuan-party/rulesets/')) throw Error('Unexpected ruleset');
+            const ruleset = await client.request({url:'https://firebaserules.googleapis.com/v1/'+name});
+            const file = ruleset.data.source?.files?.find(x=>x.name==='firestore.rules') || ruleset.data.source?.files?.[0];
+            if (!file?.content) throw Error('Firestore rules missing');
+            fs.writeFileSync('deployed_firestore.rules',file.content);
+            console.log('Read Firestore rules bytes:',file.content.length);
+          })().catch(e => {console.error('Unable to inspect rules:',e.response?.status || e.message);process.exit(1)});
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cuan-party-current-firestore-rules
+          path: deployed_firestore.rules
+          if-no-files-found: error
+      - name: Remove temporary credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase.json"
