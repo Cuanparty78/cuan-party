@@ -6,6 +6,7 @@ on:
     branches:
       - Slot-kingdom
       - spark-no-blaze
+      - cuan-party-community-v1
 
 jobs:
   build:
@@ -59,6 +60,13 @@ jobs:
           python3 scripts/apply_no_blaze_gift_ui.py
           flutter analyze lib/economy_service.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
 
+      - name: Enable community playable games
+        if: github.ref_name == 'cuan-party-community-v1'
+        run: |
+          python3 scripts/apply_no_blaze_gift_ui.py
+          python3 scripts/enable_community_games.py
+          flutter analyze lib/economy_service.dart lib/party_minigames.dart lib/luxury_app.dart --no-fatal-infos --no-fatal-warnings
+
       - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -111,7 +119,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GIFT_WORKER_URL: ${{ vars.GIFT_WORKER_URL }}
+          GIFT_WORKER_URL: ${{ vars.GIFT_WORKER_URL || 'https://cuan-workspace-api-production.up.railway.app/gift/send' }}
 
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs=-Xmx4g
