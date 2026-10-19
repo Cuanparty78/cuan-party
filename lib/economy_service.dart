@@ -58,7 +58,11 @@ class EconomyService {
       }, onError: controller.addError);
       economySub = watchEconomy(uid).listen((snap) {
         economy = snap.data(); economyLoaded = true; publish();
-      }, onError: controller.addError);
+      }, onError: (Object error, StackTrace stack) {
+        // Spark rules may only permit the root profile for older accounts.
+        // Never blank out a valid root balance when private economy is denied.
+        economy = null; economyLoaded = true; publish();
+      });
     }, onCancel: () async { await rootSub?.cancel(); await economySub?.cancel(); });
     return controller.stream;
   }
