@@ -166,10 +166,21 @@ async function sellerStockHistory(u:any){
  return {items:docs.docs.map((d:any)=>({type:d.data().type,direction:d.data().direction,amount:d.data().amount,targetCuanId:d.data().targetCuanId||null,createdAt:d.data().createdAt?.toMillis?.()||0}))};
 }
 
+function giftDiamondPercent(){
+  // Intentionally fail closed: no gift is sold if the recipient reward policy
+  // has not been explicitly configured by the Owner.
+  const percent=Number(Bun.env.GIFT_RECEIVER_DIAMOND_PERCENT||"");
+  if(!Number.isSafeInteger(percent)||percent<1||percent>100)
+    fail(503,"Persentase diamond penerima Gift belum ditetapkan oleh Owner");
+  return percent;
+}
 async function gift(u:any,b:any) {
  const roomId=String(b.roomId||""),name=String(b.targetName||"").trim(),item=b.giftName;
  if(!/^[\w-]{4,160}$/.test(roomId)||!validId(b.transactionId)||!name||name.length>100||!Object.hasOwn(catalog,item)||!Number.isSafeInteger(b.quantity)||b.quantity<1||b.quantity>7777)fail(400,"Gift tidak valid");
- const total=catalog[item]*b.quantity, from=db.collection("users").doc(u.uid),room=db.collection("rooms").doc(roomId);
+ const percent=giftDiamondPercent();
+ const total=catalog[item]*b.quantity, diamondReward=Math.floor(total*percent/100);
+ if(!Number.isSafeInteger(total)||total<1||!Number.isSafeInteger(diamondReward)||diamondReward<1)fail(400,"Jumlah hadiah di luar batas");
+ const from=db.collection("users").doc(u.uid),room=db.collection("rooms").doc(roomId);
  const sender=await from.get();if(!sender.exists)fail(404,"Pengirim tidak ada");
  let targetUid=u.uid;
  if(name!=="Saya"&&name!==sender.data()?.displayName){
@@ -180,21 +191,39 @@ async function gift(u:any,b:any) {
  const tr=db.collection("economyTransactions").doc(b.transactionId);
  return db.runTransaction(async(t:any)=>{
    const econ=from.collection("private").doc("economy"),member=room.collection("members").doc(u.uid),toMember=room.collection("members").doc(targetUid);
-   const [old,rr,m1,m2,root,ee]=await Promise.all([t.get(tr),t.get(room),t.get(member),t.get(toMember),t.get(from),t.get(econ)]);
-   if(old.exists){const d=old.data();if(d.type!=="roomGift"||d.uid!==u.uid||d.roomId!==roomId||d.receiverUid!==targetUid||d.giftName!==item||d.quantity!==b.quantity)fail(409,"ID transaksi dipakai");return {replayed:true,coin:d.newCoin,total};}
+   const receiver=db.collection("users").doc(targetUid),receiverEcon=receiver.collection("private").doc("economy");
+   const [old,rr,m1,m2,root,ee,targetRoot,targetEconomy]=await Promise.all([
+      t.get(tr),t.get(room),t.get(member),t.get(toMember),t.get(from),t.get(econ),t.get(receiver),t.get(receiverEcon)
+   ]);
+   if(old.exists){const d=old.data();if(d.type!=="roomGift"||d.uid!==u.uid||d.roomId!==roomId||d.receiverUid!==targetUid||d.giftName!==item||d.quantity!==b.quantity)fail(409,"ID transaksi dipakai");return {replayed:true,coin:d.newCoin,total,diamondReward:d.diamondReward||0};}
    if(!rr.exists||rr.data()?.isActive===false||!m1.exists||!m2.exists)fail(403,"Anggota atau room sudah keluar");
+   if(!targetRoot.exists)fail(404,"Profil penerima gift tidak ditemukan");
    if(targetUid!==u.uid&&m2.data()?.name!==name)fail(409,"Penerima berubah");
    const before=toCoin(ee.exists&&typeof ee.data()?.coin==="number"?ee.data()?.coin:root.data()?.coin);
    if(before<total)fail(400,"Coin tidak cukup");
    const after=before-total;
-   t.set(from,{coin:after,updatedAt:FieldValue.serverTimestamp()},{merge:true});
-   t.set(econ,{coin:after,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+   const diamondBefore=toCoin(targetEconomy.exists&&typeof targetEconomy.data()?.diamond==="number"
+      ?targetEconomy.data()?.diamond:targetRoot.data()?.diamond);
+   const diamondAfter=diamondBefore+diamondReward;
+   if(!Number.isSafeInteger(diamondAfter))fail(400,"Saldo diamond penerima melebihi batas");
+   // One atomic settlement: charge sender Coin AND credit recipient Diamond.
+   // When a user gifts themselves, preserve both balances in the same writes.
+   const sameUser=targetUid===u.uid;
+   const senderPatch:any={coin:after,updatedAt:FieldValue.serverTimestamp()};
+   if(sameUser)senderPatch.diamond=diamondAfter;
+   t.set(from,senderPatch,{merge:true});
+   t.set(econ,senderPatch,{merge:true});
+   if(!sameUser){
+     t.set(receiver,{diamond:diamondAfter,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+     t.set(receiverEcon,{diamond:diamondAfter,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+   }
    t.set(room,{giftTotal:FieldValue.increment(total),lastActivityAt:FieldValue.serverTimestamp()},{merge:true});
    t.create(room.collection("messages").doc(b.transactionId),{type:"gift",fromId:u.uid,fromName:m1.data()?.name||"User",toId:targetUid,toName:m2.data()?.name||name,giftName:item,quantity:b.quantity,coinCost:total,createdAt:FieldValue.serverTimestamp()});
-   t.create(db.collection("giftTransactions").doc(b.transactionId),{senderUid:u.uid,receiverUid:targetUid,roomId,giftName:item,quantity:b.quantity,unitPrice:catalog[item],total,diamondReward:0,createdAt:FieldValue.serverTimestamp()});
-   t.create(tr,{type:"roomGift",uid:u.uid,receiverUid:targetUid,roomId,giftName:item,quantity:b.quantity,total,newCoin:after,createdAt:FieldValue.serverTimestamp()});
-   t.create(from.collection("walletHistory").doc(b.transactionId),{type:"roomGift",direction:"out",amount:total,createdAt:FieldValue.serverTimestamp()});
-   return {coin:after,roomId,receiverUid:targetUid,giftName:item,quantity:b.quantity,total,diamondReward:0,messageId:b.transactionId};
+   t.create(db.collection("giftTransactions").doc(b.transactionId),{senderUid:u.uid,receiverUid:targetUid,roomId,giftName:item,quantity:b.quantity,unitPrice:catalog[item],total,diamondReward,diamondPercent:percent,createdAt:FieldValue.serverTimestamp()});
+   t.create(tr,{type:"roomGift",uid:u.uid,receiverUid:targetUid,roomId,giftName:item,quantity:b.quantity,total,diamondReward,newCoin:after,createdAt:FieldValue.serverTimestamp()});
+   t.create(from.collection("walletHistory").doc(b.transactionId),{type:"roomGift",currency:"coin",direction:"out",amount:total,createdAt:FieldValue.serverTimestamp()});
+   t.create(receiver.collection("walletHistory").doc(b.transactionId+"_diamond"),{type:"giftReceived",currency:"diamond",direction:"in",amount:diamondReward,createdAt:FieldValue.serverTimestamp()});
+   return {coin:after,roomId,receiverUid:targetUid,giftName:item,quantity:b.quantity,total,diamondReward,messageId:b.transactionId};
  });
 }
 const HTML = '<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
@@ -229,7 +258,7 @@ Bun.serve({port:Number(Bun.env.PORT||3000),async fetch(req:Request){
     for(const doc of own.docs){
       const d=doc.data(),amount=d.amount;
       if(!Number.isSafeInteger(amount)||amount<1)continue;
-      records.set(doc.id,{id:doc.id,type:d.type,direction:d.direction,amount,createdAt:ms(d.createdAt)});
+      records.set(doc.id,{id:doc.id,type:d.type,direction:d.direction,currency:d.currency==="diamond"?"diamond":"coin",amount,createdAt:ms(d.createdAt)});
     }
     // Legacy entries created before per-user walletHistory was deployed.
     for(const doc of [...received.docs,...sent.docs]){
@@ -240,7 +269,7 @@ Bun.serve({port:Number(Bun.env.PORT||3000),async fetch(req:Request){
       if(!["ownerIssue","sellerTransfer","sellerStockSend","roomGift"].includes(d.type)||!Number.isSafeInteger(amount)||amount<1)continue;
       // Coin issuance is not a debit from the owner. Only the recipient sees it as a top up.
       if(d.type==="ownerIssue"&&!incoming)continue;
-      records.set(doc.id,{id:doc.id,type:d.type,direction:incoming?"in":"out",amount,createdAt:ms(d.createdAt)});
+      records.set(doc.id,{id:doc.id,type:d.type,direction:incoming?"in":"out",currency:"coin",amount,createdAt:ms(d.createdAt)});
     }
     return res({items:[...records.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,50)});
   }
