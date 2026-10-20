@@ -3,6 +3,57 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+/// Displays seller-only navigation only when the authenticated backend says
+/// this account is Owner or an active Coin Seller. Regular users see nothing.
+/// The role endpoint is already available on the existing Railway backend.
+class CoinSellerAccess extends StatefulWidget {
+  final Widget child;
+  const CoinSellerAccess({super.key, required this.child});
+
+  @override
+  State<CoinSellerAccess> createState() => _CoinSellerAccessState();
+}
+
+class _CoinSellerAccessState extends State<CoinSellerAccess> {
+  late Future<bool> _canAccess;
+
+  @override
+  void initState() {
+    super.initState();
+    _canAccess = _checkServerRole();
+  }
+
+  Future<bool> _checkServerRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    try {
+      final token = await user.getIdToken();
+      if (token == null || token.isEmpty) return false;
+      final response = await http.get(
+        Uri.parse('https://cuan-workspace-api-production.up.railway.app/api/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 12));
+      if (response.statusCode != 200) return false;
+      final body = jsonDecode(response.body);
+      if (body is! Map) return false;
+      return body['role'] == 'owner' || body['role'] == 'seller';
+    } catch (_) {
+      // Fail closed: never show an official seller tool to ordinary accounts.
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _canAccess,
+      builder: (context, snapshot) {
+        return snapshot.data == true ? widget.child : const SizedBox.shrink();
+      },
+    );
+  }
+}
+
 /// Coin Seller stock is server-owned, separate from the user's spendable wallet.
 class CoinSellerPage extends StatefulWidget {
   const CoinSellerPage({super.key});
