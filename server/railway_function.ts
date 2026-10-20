@@ -1,5 +1,5 @@
 
-// CUAN PARTY seller stock center: 2026-10-20
+// CUAN PARTY seller stock center: 2026-10-21 • Railway GitHub deployment
 import { initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
