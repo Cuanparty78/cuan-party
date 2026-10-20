@@ -708,6 +708,8 @@ exports.sendRoomGift = onCall(async (request) => {
   const receiverMemberRef = roomRef
     .collection("members")
     .doc(receiverUid);
+  const receiverRootRef = db.collection("users").doc(receiverUid);
+  const receiverEconomyRef = receiverRootRef.collection("private").doc("economy");
   const transactionRef = db
     .collection("economyTransactions")
     .doc(transactionId);
@@ -726,6 +728,8 @@ exports.sendRoomGift = onCall(async (request) => {
       receiverMemberSnap,
       senderRootSnap,
       senderEconSnap,
+      receiverRootSnap,
+      receiverEconSnap,
     ] = await Promise.all([
       tx.get(transactionRef),
       tx.get(roomRef),
@@ -733,6 +737,8 @@ exports.sendRoomGift = onCall(async (request) => {
       tx.get(receiverMemberRef),
       tx.get(senderRootRef),
       tx.get(senderEconomyRef),
+      tx.get(receiverRootRef),
+      tx.get(receiverEconomyRef),
     ]);
 
     if (idempotencySnap.exists) {
@@ -768,7 +774,7 @@ exports.sendRoomGift = onCall(async (request) => {
       );
     }
 
-    if (!receiverMemberSnap.exists) {
+    if (!receiverMemberSnap.exists || !receiverRootSnap.exists) {
       throw new HttpsError(
         "not-found",
         "Penerima sudah keluar dari room.",
@@ -800,8 +806,13 @@ exports.sendRoomGift = onCall(async (request) => {
 
     const newCoin = econ.coin - total;
 
-    // Set from server-side gift policy later.
-    const diamondReward = 0;
+    // Final CUAN PARTY policy: Gift credits 100% Diamond to recipient.
+    const diamondReward = total;
+    const recipient = economyFrom(receiverRootSnap.data(), receiverEconSnap.data());
+    const nextDiamond = recipient.diamond + diamondReward;
+    if (!Number.isSafeInteger(total) || total < 1 || !Number.isSafeInteger(nextDiamond)) {
+      throw new HttpsError("failed-precondition", "Saldo Gift melewati batas aman.");
+    }
 
     const result = {
       coin: newCoin,
@@ -815,23 +826,16 @@ exports.sendRoomGift = onCall(async (request) => {
       messageId: messageRef.id,
     };
 
-    tx.set(
-      senderEconomyRef,
-      {
-        coin: newCoin,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-    tx.set(
-      senderRootRef,
-      {
-        coin: newCoin,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    const sameUser = senderUid === receiverUid;
+    const senderPatch = { coin: newCoin, updatedAt: FieldValue.serverTimestamp() };
+    if (sameUser) senderPatch.diamond = nextDiamond;
+    tx.set(senderEconomyRef, senderPatch, { merge: true });
+    tx.set(senderRootRef, senderPatch, { merge: true });
+    if (!sameUser) {
+      const recipientPatch = { diamond: nextDiamond, updatedAt: FieldValue.serverTimestamp() };
+      tx.set(receiverEconomyRef, recipientPatch, { merge: true });
+      tx.set(receiverRootRef, recipientPatch, { merge: true });
+    }
 
     tx.update(roomRef, {
       giftTotal: FieldValue.increment(total),
@@ -865,6 +869,14 @@ exports.sendRoomGift = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    tx.create(senderRootRef.collection("walletHistory").doc(transactionId), {
+      type: "roomGift", currency: "coin", direction: "out", amount: total,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.create(receiverRootRef.collection("walletHistory").doc(transactionId + "_diamond"), {
+      type: "giftReceived", currency: "diamond", direction: "in", amount: diamondReward,
+      createdAt: FieldValue.serverTimestamp(),
+    });
     tx.set(transactionRef, {
       uid: senderUid,
       type: "roomGift",
