@@ -178,6 +178,30 @@ class EconomyService {
     return data;
   }
 
+  /// Server-verified top-up and transfer history. Never trust an APK-local list
+  /// as proof that coin was credited.
+  Future<List<Map<String, dynamic>>> getWalletHistory() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('Login dahulu untuk melihat riwayat.');
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('Sesi login habis, silakan masuk kembali.');
+    }
+    const endpoint = 'https://cuan-workspace-api-production.up.railway.app/api/wallet/history';
+    final response = await http.get(
+      Uri.parse(endpoint),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 20));
+    final payload = jsonDecode(response.body);
+    if (payload is! Map) throw StateError('Riwayat dari server tidak valid.');
+    if (response.statusCode != 200) {
+      throw StateError(payload['error']?.toString() ?? 'Gagal memuat riwayat.');
+    }
+    final records = payload['items'];
+    if (records is! List) throw StateError('Format riwayat tidak valid.');
+    return records.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
   /// No Blaze needed: sends the signed-in user's Firebase ID token to a
   /// separately hosted Cloudflare Worker. An unset URL fails closed.
   ///
