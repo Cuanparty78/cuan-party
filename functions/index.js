@@ -510,11 +510,13 @@ exports.sendGift = onCall(async (request) => {
       senderRoot,
       senderEcon,
       receiverRoot,
+      receiverEcon,
     ] = await Promise.all([
       tx.get(transactionRef),
       tx.get(senderRefs.userRef),
       tx.get(senderRefs.economyRef),
       tx.get(receiverRefs.userRef),
+      tx.get(receiverRefs.economyRef),
     ]);
 
     if (idempotencySnap.exists) {
@@ -551,9 +553,13 @@ exports.sendGift = onCall(async (request) => {
 
     const newCoin = econ.coin - total;
 
-    // Intentionally 0 until CUAN PARTY's final receiver conversion
-    // policy is configured server-side.
-    const diamondReward = 0;
+    // Final CUAN PARTY policy: 100% Diamond reward on every Gift.
+    const diamondReward = total;
+    const recipient = economyFrom(receiverRoot.data(), receiverEcon.data());
+    const nextDiamond = recipient.diamond + diamondReward;
+    if (!Number.isSafeInteger(total) || total < 1 || !Number.isSafeInteger(nextDiamond)) {
+      throw new HttpsError("failed-precondition", "Saldo Gift melewati batas aman.");
+    }
 
     const result = {
       coin: newCoin,
@@ -565,23 +571,16 @@ exports.sendGift = onCall(async (request) => {
       diamondReward,
     };
 
-    tx.set(
-      senderRefs.economyRef,
-      {
-        coin: newCoin,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-    tx.set(
-      senderRefs.userRef,
-      {
-        coin: newCoin,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    const sameUser = senderUid === receiverUid;
+    const senderPatch = { coin: newCoin, updatedAt: FieldValue.serverTimestamp() };
+    if (sameUser) senderPatch.diamond = nextDiamond;
+    tx.set(senderRefs.economyRef, senderPatch, { merge: true });
+    tx.set(senderRefs.userRef, senderPatch, { merge: true });
+    if (!sameUser) {
+      const recipientPatch = { diamond: nextDiamond, updatedAt: FieldValue.serverTimestamp() };
+      tx.set(receiverRefs.economyRef, recipientPatch, { merge: true });
+      tx.set(receiverRefs.userRef, recipientPatch, { merge: true });
+    }
 
     tx.set(giftRef, {
       senderUid,
@@ -595,6 +594,14 @@ exports.sendGift = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    tx.create(senderRefs.userRef.collection("walletHistory").doc(transactionId), {
+      type: "gift", currency: "coin", direction: "out", amount: total,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.create(receiverRefs.userRef.collection("walletHistory").doc(transactionId + "_diamond"), {
+      type: "giftReceived", currency: "diamond", direction: "in", amount: diamondReward,
+      createdAt: FieldValue.serverTimestamp(),
+    });
     tx.set(transactionRef, {
       uid: senderUid,
       type: "gift",
