@@ -1,4 +1,5 @@
 
+// CUAN PARTY seller stock center: 2026-10-20
 import { initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -55,19 +56,19 @@ async function issue(u:any,b:any){
   t.set(to.ref,{coin:after,updatedAt:FieldValue.serverTimestamp()},{merge:true});
   t.set(to.ref.collection("private").doc("economy"),{coin:after,updatedAt:FieldValue.serverTimestamp()},{merge:true});
   t.create(tr,{type:"ownerIssue",uid:u.uid,targetUid:to.id,targetCuanId:String(b.targetId),amount:b.amount,newCoin:after,createdAt:FieldValue.serverTimestamp()});
+  t.create(to.ref.collection("walletHistory").doc(b.transactionId),{type:"ownerIssue",direction:"in",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
   return {targetId:String(b.targetId),credited:b.amount,coin:after};
  });
 }
 async function seller(u:any,b:any){
  if(!owner(u))fail(403,"Owner saja");
  const to=await findAccount(b.targetId);
- if(to.id===u.uid)fail(400,"Akun owner tidak bisa menjadi seller");
  const active=b.active===true;
  await db.collection("coinSellers").doc(to.id).set({active,cuanId:String(b.targetId),name:to.data()?.displayName||"",updatedBy:u.uid,updatedAt:FieldValue.serverTimestamp()},{merge:true});
  return {targetId:b.targetId,active};
 }
 async function transfer(u:any,b:any){
- if(await role(u)!=="seller")fail(403,"Hanya seller aktif");
+ if(!(await db.collection("coinSellers").doc(u.uid).get()).data()?.active)fail(403,"Hanya seller aktif");
  if(!validId(b.transactionId)||!Number.isSafeInteger(b.amount)||b.amount<1||b.amount>1000000000)fail(400,"Data transaksi tidak valid");
  const to=await findAccount(b.targetId);
  if(to.id===u.uid)fail(400,"Tidak bisa transfer ke diri sendiri");
@@ -84,9 +85,87 @@ async function transfer(u:any,b:any){
    if(!Number.isSafeInteger(v))fail(400,"Saldo penerima melebihi batas");
    for(const [ref,coin] of [[from,a-b.amount],[fe,a-b.amount],[to.ref,v],[te,v]])t.set(ref,{coin,updatedAt:FieldValue.serverTimestamp()},{merge:true});
    t.create(tr,{type:"sellerTransfer",uid:u.uid,targetUid:to.id,targetCuanId:String(b.targetId),amount:b.amount,newCoin:a-b.amount,createdAt:FieldValue.serverTimestamp()});
+   t.create(from.collection("walletHistory").doc(b.transactionId),{type:"sellerTransfer",direction:"out",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
+   t.create(to.ref.collection("walletHistory").doc(b.transactionId),{type:"sellerTransfer",direction:"in",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
    return {targetId:b.targetId,credited:b.amount,remaining:a-b.amount};
  });
 }
+
+function validCoinAmount(b:any){
+ if(!Number.isSafeInteger(b.amount)||b.amount<1||b.amount>1000000000)fail(400,"Jumlah harus 1 - 1.000.000.000 Coin");
+ if(!validId(b.transactionId))fail(400,"ID transaksi tidak valid");
+}
+async function sellerSelf(u:any){
+ if(!owner(u))fail(403,"Hanya owner boleh mengaktifkan dirinya sebagai Coin Seller");
+ const profile=await db.collection("users").doc(u.uid).get();
+ if(!profile.exists)fail(404,"Akun JEP belum terdaftar di aplikasi");
+ const id=String(profile.data()?.cuanId||"").trim();
+ if(!/^[0-9]{6,13}$/.test(id))fail(400,"CUAN ID profil belum valid");
+ await db.collection("coinSellers").doc(u.uid).set({active:true,cuanId:id,name:profile.data()?.name||profile.data()?.displayName||"JEP",updatedBy:u.uid,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+ return {active:true,cuanId:id};
+}
+async function sellerMe(u:any){
+ const [seller,root]=await Promise.all([db.collection("coinSellers").doc(u.uid).get(),db.collection("users").doc(u.uid).get()]);
+ const data=seller.data()||{};
+ return {active:data.active===true,owner:owner(u),stockCoin:toCoin(data.stockCoin),cuanId:String(root.data()?.cuanId||data.cuanId||""),walletCoin:toCoin(root.data()?.coin)};
+}
+async function sellerFund(u:any,b:any){
+ if(!owner(u))fail(403,"Hanya owner bisa mengisi saldo stok seller");
+ validCoinAmount(b);
+ const target=await findAccount(b.targetId);
+ const ref=db.collection("coinSellers").doc(target.id),tr=db.collection("economyTransactions").doc(b.transactionId);
+ return db.runTransaction(async(t:any)=>{
+  const [old,sellerSnap]=await Promise.all([t.get(tr),t.get(ref)]);
+  if(old.exists){
+   const d=old.data();
+   if(d.type!=="sellerStockTopup"||d.uid!==u.uid||d.targetUid!==target.id||d.amount!==b.amount)fail(409,"ID transaksi sudah digunakan");
+   return {replayed:true,stockCoin:toCoin(d.newStockCoin),targetId:String(b.targetId)};
+  }
+  if(!sellerSnap.exists||sellerSnap.data()?.active!==true)fail(403,"Seller belum aktif");
+  const after=toCoin(sellerSnap.data()?.stockCoin)+b.amount;
+  if(!Number.isSafeInteger(after))fail(400,"Saldo seller melebihi batas");
+  t.set(ref,{stockCoin:after,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  t.create(tr,{type:"sellerStockTopup",uid:u.uid,targetUid:target.id,targetCuanId:String(b.targetId),amount:b.amount,newStockCoin:after,createdAt:FieldValue.serverTimestamp()});
+  t.create(ref.collection("stockHistory").doc(b.transactionId),{type:"stockTopup",direction:"in",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
+  return {credited:b.amount,targetId:String(b.targetId),stockCoin:after};
+ });
+}
+async function sellerStockSend(u:any,b:any){
+ validCoinAmount(b);
+ const target=await findAccount(b.targetId);
+ const stockRef=db.collection("coinSellers").doc(u.uid);
+ const tr=db.collection("economyTransactions").doc(b.transactionId);
+ return db.runTransaction(async(t:any)=>{
+  const targetEconomy=target.ref.collection("private").doc("economy");
+  const [old,sellerSnap,root,econ]=await Promise.all([t.get(tr),t.get(stockRef),t.get(target.ref),t.get(targetEconomy)]);
+  if(old.exists){
+   const d=old.data();
+   if(d.type!=="sellerStockSend"||d.uid!==u.uid||d.targetUid!==target.id||d.amount!==b.amount)fail(409,"ID transaksi sudah digunakan");
+   return {replayed:true,credited:b.amount,targetId:String(b.targetId),stockCoin:toCoin(d.newStockCoin)};
+  }
+  if(!sellerSnap.exists||sellerSnap.data()?.active!==true)fail(403,"Coin Seller belum aktif");
+  if(!root.exists)fail(404,"Akun penerima tidak ditemukan");
+  const stock=toCoin(sellerSnap.data()?.stockCoin);
+  if(stock<b.amount)fail(400,"Saldo stok Coin Seller tidak mencukupi");
+  const nextCoin=toCoin(econ.exists&&typeof econ.data()?.coin==="number"?econ.data()?.coin:root.data()?.coin)+b.amount;
+  if(!Number.isSafeInteger(nextCoin))fail(400,"Saldo dompet user melebihi batas");
+  const left=stock-b.amount;
+  t.set(stockRef,{stockCoin:left,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  t.set(target.ref,{coin:nextCoin,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  t.set(targetEconomy,{coin:nextCoin,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  t.create(tr,{type:"sellerStockSend",uid:u.uid,targetUid:target.id,targetCuanId:String(b.targetId),amount:b.amount,newStockCoin:left,newCoin:nextCoin,createdAt:FieldValue.serverTimestamp()});
+  t.create(target.ref.collection("walletHistory").doc(b.transactionId),{type:"sellerStockSend",direction:"in",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
+  t.create(stockRef.collection("stockHistory").doc(b.transactionId),{type:"stockSend",direction:"out",targetCuanId:String(b.targetId),amount:b.amount,createdAt:FieldValue.serverTimestamp()});
+  return {credited:b.amount,targetId:String(b.targetId),stockCoin:left,walletCoin:nextCoin};
+ });
+}
+async function sellerStockHistory(u:any){
+ const s=await db.collection("coinSellers").doc(u.uid).get();
+ if(!s.exists||s.data()?.active!==true)fail(403,"Coin Seller belum aktif");
+ const docs=await s.ref.collection("stockHistory").orderBy("createdAt","desc").limit(40).get();
+ return {items:docs.docs.map((d:any)=>({type:d.data().type,direction:d.data().direction,amount:d.data().amount,targetCuanId:d.data().targetCuanId||null,createdAt:d.data().createdAt?.toMillis?.()||0}))};
+}
+
 async function gift(u:any,b:any) {
  const roomId=String(b.roomId||""),name=String(b.targetName||"").trim(),item=b.giftName;
  if(!/^[\w-]{4,160}$/.test(roomId)||!validId(b.transactionId)||!name||name.length>100||!Object.hasOwn(catalog,item)||!Number.isSafeInteger(b.quantity)||b.quantity<1||b.quantity>7777)fail(400,"Gift tidak valid");
@@ -114,23 +193,57 @@ async function gift(u:any,b:any) {
    t.create(room.collection("messages").doc(b.transactionId),{type:"gift",fromId:u.uid,fromName:m1.data()?.name||"User",toId:targetUid,toName:m2.data()?.name||name,giftName:item,quantity:b.quantity,coinCost:total,createdAt:FieldValue.serverTimestamp()});
    t.create(db.collection("giftTransactions").doc(b.transactionId),{senderUid:u.uid,receiverUid:targetUid,roomId,giftName:item,quantity:b.quantity,unitPrice:catalog[item],total,diamondReward:0,createdAt:FieldValue.serverTimestamp()});
    t.create(tr,{type:"roomGift",uid:u.uid,receiverUid:targetUid,roomId,giftName:item,quantity:b.quantity,total,newCoin:after,createdAt:FieldValue.serverTimestamp()});
+   t.create(from.collection("walletHistory").doc(b.transactionId),{type:"roomGift",direction:"out",amount:total,createdAt:FieldValue.serverTimestamp()});
    return {coin:after,roomId,receiverUid:targetUid,giftName:item,quantity:b.quantity,total,diamondReward:0,messageId:b.transactionId};
  });
 }
 const HTML = '<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
 '<title>CUAN PARTY Workspace</title><style>body{font-family:system-ui;background:linear-gradient(135deg,#080916,#362053);color:#fff;margin:0;min-height:100vh}header{padding:22px 6%;border-bottom:1px solid #95763c}h1,h2{color:#f1d48c}main{max-width:1000px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px}.card{padding:22px;border:1px solid #8d6f5d;border-radius:20px;background:#251a3b;margin-bottom:16px}input,select{display:block;width:100%;padding:12px;box-sizing:border-box;border-radius:10px;background:#140e26;color:white;border:1px solid #987aa4;margin:8px 0 15px}button{border:0;border-radius:12px;padding:13px 18px;background:linear-gradient(90deg,#f3dea1,#bc8b3e);font-weight:800;cursor:pointer}small,p{color:#c5bad0;line-height:1.6}.hide{display:none}pre{overflow:auto;white-space:pre-wrap}</style>'+
 '<header><h1>♛ CUAN PARTY • Workspace</h1><small>Panel Owner • Coin Seller • Gift</small></header><main><section class="card" id="login"><h2>Masuk Google</h2><button id="signIn">Login Panel</button><p id="serverStatus">Menghubungkan...</p></section>'+
-'<div id="dashboard" class="hide"><section class="card"><h2>Manajemen COIN</h2><p id="identity"></p><small>User tidak bisa melakukan top-up sendiri. Hanya owner yang bisa membuat coin baru. Seller hanya bisa kirim dari saldo miliknya.</small></section><div class="grid"><section class="card"><h2>💰 Kirim Coin</h2><form id="send"><label>ID akun penerima</label><input name="targetId" required placeholder="1000110"><label>Jumlah Coin</label><input type="number" name="amount" min="1" max="1000000000" required><button>Kirim Coin</button></form></section><section class="card" id="sellerBox"><h2>🏪 Akun Coin Seller</h2><form id="seller"><label>ID akun Seller</label><input name="targetId" required placeholder="1000111"><label>Status</label><select name="active"><option value="true">Aktif</option><option value="false">Nonaktif</option></select><button>Simpan Seller</button></form></section></div><section class="card"><h2>📃 Riwayat</h2><button id="refresh">Muat Ulang</button><pre id="history"></pre></section><section class="card"><h2>Keamanan</h2><p>🔒 Transaksi melalui server dan ID unik. Tidak ada pembayaran otomatis. Firestore Rules wajib memblokir perubahan coin dari sisi APK.</p><button id="signOut">Keluar</button></section><pre id="out"></pre></div></main>'+
-'<script type="module">import{initializeApp}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";import{getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";const q=x=>document.getElementById(x);const conf=await fetch("/api/config").then(r=>r.json());q("serverStatus").textContent=conf.ready?"Backend terhubung":"Firebase credential belum diaktifkan";const a=getAuth(initializeApp({apiKey:conf.apiKey,authDomain:"cuan-party.firebaseapp.com",projectId:"cuan-party"}));async function call(url,data){if(!a.currentUser)throw Error("Login dulu");const opt={headers:{Authorization:"Bearer "+await a.currentUser.getIdToken()}};if(data){opt.method="POST";opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(data)}const r=await fetch(url,opt);const j=await r.json();if(!r.ok)throw Error(j.error||"Gagal");return j};let role="user";q("signIn").onclick=()=>signInWithPopup(a,new GoogleAuthProvider()).catch(e=>alert(e.message));q("signOut").onclick=()=>signOut(a);async function history(){try{q("history").textContent=JSON.stringify((await call("/api/history")).items,null,2)}catch(e){q("history").textContent=e.message}}q("refresh").onclick=history;onAuthStateChanged(a,async u=>{q("login").classList.toggle("hide",!!u);q("dashboard").classList.toggle("hide",!u);if(!u)return;try{const me=await call("/api/me");role=me.role;q("identity").textContent=(u.displayName||"Akun")+" • "+role.toUpperCase();q("sellerBox").classList.toggle("hide",role!=="owner");history()}catch(e){q("out").textContent=e.message}});q("send").onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.amount=Number(d.amount);d.transactionId=crypto.randomUUID();try{q("out").textContent=JSON.stringify(await call(role==="owner"?"/api/coin/issue":"/api/coin/transfer",d),null,2);history()}catch(e){q("out").textContent=e.message}};q("seller").onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.active=d.active==="true";try{q("out").textContent=JSON.stringify(await call("/api/seller/set",d),null,2)}catch(e){q("out").textContent=e.message}};</script></html>';
+'<div id="dashboard" class="hide"><section class="card"><h2>Manajemen COIN</h2><p id="identity"></p><small>User tidak bisa melakukan top-up sendiri. Hanya owner yang bisa membuat coin baru. Seller hanya bisa kirim dari saldo miliknya.</small></section><div class="grid"><section class="card"><h2>💰 Kirim Coin</h2><form id="send"><label>ID akun penerima</label><input name="targetId" required placeholder="1000110"><label>Jumlah Coin</label><input type="number" name="amount" min="1" max="1000000000" required><button>Kirim Coin</button><p id="sendStatus" role="status" aria-live="polite" style="font-size:15px;font-weight:700;color:#f1d48c"></p></form></section><section class="card" id="sellerBox"><h2>🏪 Akun Coin Seller</h2><form id="seller"><label>ID akun Seller</label><input name="targetId" required placeholder="1000111"><label>Status</label><select name="active"><option value="true">Aktif</option><option value="false">Nonaktif</option></select><button>Simpan Seller</button></form><button type="button" id="sellerSelf">👑 Aktifkan JEP sebagai Coin Seller</button><p id="selfStatus" role="status"></p><hr style="border:0;border-top:1px solid #725a59;margin:22px 0"><h3 style="color:#f1d48c">💰 Isi Saldo Stok Coin Seller</h3><p>Stok Coin Seller terpisah dari dompet pribadi. Seller boleh kirim ke dompetnya sendiri atau pemain lain.</p><form id="sellerFund"><label>ID akun seller</label><input name="targetId" required placeholder="ID akun JEP / seller lain"><label>Jumlah Coin stok</label><input type="number" name="amount" min="1" max="1000000000" required><button>Isi Stok Seller</button><p id="fundStatus" role="status"></p></form></section></div><section class="card"><h2>📃 Riwayat</h2><button id="refresh">Muat Ulang</button><pre id="history"></pre></section><section class="card"><h2>Keamanan</h2><p>🔒 Transaksi melalui server dan ID unik. Tidak ada pembayaran otomatis. Firestore Rules wajib memblokir perubahan coin dari sisi APK.</p><button id="signOut">Keluar</button></section><pre id="out"></pre></div></main>'+
+'<script type="module">import{initializeApp}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";import{getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";const q=x=>document.getElementById(x);const conf=await fetch("/api/config").then(r=>r.json());q("serverStatus").textContent=conf.ready?"Backend terhubung":"Firebase credential belum diaktifkan";const a=getAuth(initializeApp({apiKey:conf.apiKey,authDomain:"cuan-party.firebaseapp.com",projectId:"cuan-party"}));async function call(url,data){if(!a.currentUser)throw Error("Login dulu");const opt={headers:{Authorization:"Bearer "+await a.currentUser.getIdToken()}};if(data){opt.method="POST";opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(data)}const r=await fetch(url,opt);const j=await r.json();if(!r.ok)throw Error(j.error||"Gagal");return j};let role="user";q("signIn").onclick=()=>signInWithPopup(a,new GoogleAuthProvider()).catch(e=>alert(e.message));q("signOut").onclick=()=>signOut(a);async function history(){try{q("history").textContent=JSON.stringify((await call("/api/history")).items,null,2)}catch(e){q("history").textContent=e.message}}q("refresh").onclick=history;onAuthStateChanged(a,async u=>{q("login").classList.toggle("hide",!!u);q("dashboard").classList.toggle("hide",!u);if(!u)return;try{const me=await call("/api/me");role=me.role;q("identity").textContent=(u.displayName||"Akun")+" • "+role.toUpperCase();q("sellerBox").classList.toggle("hide",role!=="owner");history()}catch(e){q("out").textContent=e.message}});q("send").onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.amount=Number(d.amount);d.transactionId=crypto.randomUUID();const btn=q("send").querySelector("button");btn.disabled=true;q("sendStatus").textContent="⏳ Memproses pengiriman...";try{const result=await call(role==="owner"?"/api/coin/issue":"/api/coin/transfer",d);q("sendStatus").textContent="✅ BERHASIL TERKIRIM: "+Number(result.credited||d.amount).toLocaleString("id-ID")+" Coin ke ID "+d.targetId+" • Saldo penerima tercatat di server.";q("out").textContent=JSON.stringify(result,null,2);q("send").reset();history()}catch(err){q("sendStatus").textContent="❌ GAGAL: "+err.message;q("out").textContent=err.message}finally{btn.disabled=false}};q("seller").onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.active=d.active==="true";try{q("out").textContent=JSON.stringify(await call("/api/seller/set",d),null,2)}catch(e){q("out").textContent=e.message}};
+q("sellerSelf").onclick=async()=>{if(!confirm("Aktifkan akun JEP sebagai Coin Seller?"))return;const el=q("selfStatus");el.textContent="Memproses...";try{const result=await call("/api/seller/self",{});el.textContent="✅ JEP menjadi Coin Seller. CUAN ID: "+result.cuanId+" (masukkan ID ini ketika mengisi stok).";q("out").textContent=JSON.stringify(result,null,2)}catch(err){el.textContent="❌ "+err.message}};
+q("sellerFund").onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.amount=Number(d.amount);d.transactionId=crypto.randomUUID();if(!confirm("Isi STOK seller ID "+d.targetId+" sebanyak "+d.amount.toLocaleString("id-ID")+" Coin?"))return;const el=q("fundStatus"),btn=q("sellerFund").querySelector("button");btn.disabled=true;el.textContent="⏳ Memproses stok seller...";try{const v=await call("/api/seller/fund",d);el.textContent="✅ STOK SELLER TERISI: "+Number(v.credited).toLocaleString("id-ID")+" Coin → ID "+v.targetId+". Saldo stok: "+Number(v.stockCoin).toLocaleString("id-ID");q("out").textContent=JSON.stringify(v,null,2);history()}catch(err){el.textContent="❌ "+err.message}finally{btn.disabled=false}};</script></html>';
 Bun.serve({port:Number(Bun.env.PORT||3000),async fetch(req:Request){
  try{
   const url=new URL(req.url),p=url.pathname;
   if(req.method==="GET"&&p==="/")return new Response(HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff"}});
   if(req.method==="GET"&&p==="/health")return res({online:true,ready:!!db});
-  if(req.method==="GET"&&p==="/api/config")return res({ready:!!db,apiKey:Bun.env.FIREBASE_WEB_API_KEY||""});
+  if(req.method==="GET"&&p==="/api/config")return res({ready:!!db,apiKey:Bun.env.FIREBASE_WEB_API_KEY||"",sellerCenter:true});
   if(!p.startsWith("/api/")&&p!=="/gift/send")fail(404,"Tidak ditemukan");
+  if(p==="/gift/send" && Bun.env.GIFT_WRITES_ENABLED!=="true")fail(503,"Pengiriman gift belum diaktifkan");
   const u=await user(req);
   if(req.method==="GET"&&p==="/api/me")return res({role:await role(u),ready:!!db});
+  if(req.method==="GET"&&p==="/api/seller/me")return res(await sellerMe(u));
+  if(req.method==="GET"&&p==="/api/seller/history")return res(await sellerStockHistory(u));
+  if(req.method==="GET"&&p==="/api/wallet/history"){
+    // Backend-only query. Never return another user's transaction ledger.
+    const ledger=db.collection("users").doc(u.uid).collection("walletHistory");
+    const [own,received,sent]=await Promise.all([
+      ledger.orderBy("createdAt","desc").limit(75).get(),
+      db.collection("economyTransactions").where("targetUid","==",u.uid).limit(100).get(),
+      db.collection("economyTransactions").where("uid","==",u.uid).limit(100).get(),
+    ]);
+    const records=new Map<string,any>();
+    const ms=(v:any)=>v&&typeof v.toMillis==="function"?v.toMillis():0;
+    for(const doc of own.docs){
+      const d=doc.data(),amount=d.amount;
+      if(!Number.isSafeInteger(amount)||amount<1)continue;
+      records.set(doc.id,{id:doc.id,type:d.type,direction:d.direction,amount,createdAt:ms(d.createdAt)});
+    }
+    // Legacy entries created before per-user walletHistory was deployed.
+    for(const doc of [...received.docs,...sent.docs]){
+      if(records.has(doc.id))continue;
+      const d=doc.data(),incoming=d.targetUid===u.uid;
+      if(!incoming&&d.uid!==u.uid)continue;
+      const amount=d.type==="roomGift"?d.total:d.amount;
+      if(!["ownerIssue","sellerTransfer","sellerStockSend","roomGift"].includes(d.type)||!Number.isSafeInteger(amount)||amount<1)continue;
+      // Coin issuance is not a debit from the owner. Only the recipient sees it as a top up.
+      if(d.type==="ownerIssue"&&!incoming)continue;
+      records.set(doc.id,{id:doc.id,type:d.type,direction:incoming?"in":"out",amount,createdAt:ms(d.createdAt)});
+    }
+    return res({items:[...records.values()].sort((a,b)=>b.createdAt-a.createdAt).slice(0,50)});
+  }
   if(req.method==="GET"&&p==="/api/history"){
    const r=await role(u);if(r==="user")fail(403,"Hanya owner dan seller");
    const docs=await db.collection("economyTransactions").orderBy("createdAt","desc").limit(75).get();
@@ -143,6 +256,9 @@ Bun.serve({port:Number(Bun.env.PORT||3000),async fetch(req:Request){
   let b:any;try{b=JSON.parse(text)}catch{fail(400,"JSON tidak valid")}
   if(p==="/api/coin/issue")return res(await issue(u,b));
   if(p==="/api/seller/set")return res(await seller(u,b));
+  if(p==="/api/seller/self")return res(await sellerSelf(u));
+  if(p==="/api/seller/fund")return res(await sellerFund(u,b));
+  if(p==="/api/seller/send")return res(await sellerStockSend(u,b));
   if(p==="/api/coin/transfer")return res(await transfer(u,b));
   if(p==="/gift/send")return res(await gift(u,b));
   fail(404,"Endpoint tidak ditemukan");
