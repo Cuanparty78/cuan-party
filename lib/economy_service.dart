@@ -98,11 +98,28 @@ class EconomyService {
     required int diamond,
     required String transactionId,
   }) async {
-    final result = await _functions.httpsCallable('exchangeDiamondToCoin').call({
-      'diamond': diamond,
-      'transactionId': transactionId,
-    });
-    return Map<String, dynamic>.from(result.data as Map);
+    // Firebase callable needs Blaze. Spark uses our trusted Railway server.
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('Login dahulu untuk Exchange.');
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('Sesi login sudah habis.');
+    }
+    final response = await http.post(
+      Uri.parse('https://cuan-workspace-api-production.up.railway.app/api/diamond/exchange'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'diamond': diamond, 'transactionId': transactionId}),
+    ).timeout(const Duration(seconds: 25));
+    final payload = jsonDecode(response.body);
+    if (payload is! Map) throw StateError('Respons Exchange tidak valid.');
+    final data = Map<String, dynamic>.from(payload);
+    if (response.statusCode != 200) {
+      throw StateError(data['error']?.toString() ?? 'Exchange gagal.');
+    }
+    return data;
   }
 
   Future<Map<String, dynamic>> sendGift({
