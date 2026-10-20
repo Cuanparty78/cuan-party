@@ -28,19 +28,22 @@ new_state = '''class _WalletPageState extends State<WalletPage> {
     final kind = record['type']?.toString() ?? '';
     final incoming = record['direction'] == 'in';
     final amount = record['amount'] is num ? (record['amount'] as num).toInt() : 0;
+    final currency = record['currency'] == 'diamond' ? 'Diamond' : 'Coin';
     final heading = kind == 'ownerIssue'
         ? 'Isi Coin dari Owner'
         : kind == 'sellerTransfer'
             ? (incoming ? 'Isi Coin dari Seller' : 'Transfer ke User')
             : kind == 'sellerStockSend'
                 ? 'Isi Coin dari Coin Seller'
-                : kind == 'roomGift' ? 'Kirim Gift' : 'Transaksi Coin';
+                : kind == 'roomGift' ? 'Kirim Gift'
+                : kind == 'giftReceived' ? 'Gift Diterima'
+                : 'Transaksi $currency';
     final millis = record['createdAt'] is num ? (record['createdAt'] as num).toInt() : 0;
     final date = millis > 0 ? DateTime.fromMillisecondsSinceEpoch(millis).toLocal() : null;
     final when = date == null ? '' :
         ' • ${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    return '$heading\\n${incoming ? '+' : '-'}${_formatCoins(amount)} Coin$when';
+    return '$heading\\n${incoming ? '+' : '-'}${_formatCoins(amount)} $currency$when';
   }'''
 assert s.count(old_state) == 1, 'Wallet State not found'
 s = s.replace(old_state, new_state, 1)
