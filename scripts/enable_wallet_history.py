@@ -32,7 +32,9 @@ new_state = '''class _WalletPageState extends State<WalletPage> {
         ? 'Isi Coin dari Owner'
         : kind == 'sellerTransfer'
             ? (incoming ? 'Isi Coin dari Seller' : 'Transfer ke User')
-            : kind == 'roomGift' ? 'Kirim Gift' : 'Transaksi Coin';
+            : kind == 'sellerStockSend'
+                ? 'Isi Coin dari Coin Seller'
+                : kind == 'roomGift' ? 'Kirim Gift' : 'Transaksi Coin';
     final millis = record['createdAt'] is num ? (record['createdAt'] as num).toInt() : 0;
     final date = millis > 0 ? DateTime.fromMillisecondsSinceEpoch(millis).toLocal() : null;
     final when = date == null ? '' :
