@@ -38,7 +38,7 @@ new_state = '''class _WalletPageState extends State<WalletPage> {
     final when = date == null ? '' :
         ' • ${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    return '$heading\n${incoming ? '+' : '-'}${_formatCoins(amount)} Coin$when';
+    return '$heading\\n${incoming ? '+' : '-'}${_formatCoins(amount)} Coin$when';
   }'''
 assert s.count(old_state) == 1, 'Wallet State not found'
 s = s.replace(old_state, new_state, 1)
