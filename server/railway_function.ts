@@ -166,14 +166,46 @@ async function sellerStockHistory(u:any){
  return {items:docs.docs.map((d:any)=>({type:d.data().type,direction:d.data().direction,amount:d.data().amount,targetCuanId:d.data().targetCuanId||null,createdAt:d.data().createdAt?.toMillis?.()||0}))};
 }
 
-function giftDiamondPercent(){
-  // Intentionally fail closed: no gift is sold if the recipient reward policy
-  // has not been explicitly configured by the Owner.
-  const percent=Number(Bun.env.GIFT_RECEIVER_DIAMOND_PERCENT||"");
-  if(!Number.isSafeInteger(percent)||percent<1||percent>100)
-    fail(503,"Persentase diamond penerima Gift belum ditetapkan oleh Owner");
-  return percent;
+// Final decision from Owner JEP: Gift pays Diamond 1:1; Exchange returns 70% Coin.
+// Keep both rates enforced by the trusted backend, never by editable client fields.
+const GIFT_DIAMOND_PERCENT=100;
+const DIAMOND_EXCHANGE_COIN_PERCENT=70;
+function giftDiamondPercent(){ return GIFT_DIAMOND_PERCENT; }
+async function exchangeDiamond(u:any,b:any){
+ // Diamond to Coin conversion: always server-enforced 70%. No client minting.
+ const diamond=b?.diamond;
+ if(!validId(b?.transactionId)||!Number.isSafeInteger(diamond)||diamond<100||diamond>1000000000||diamond%100!==0)
+   fail(400,"Jumlah Diamond harus kelipatan 100 (100–1.000.000.000), dan ID transaksi valid");
+ const coinAdded=(diamond/100)*DIAMOND_EXCHANGE_COIN_PERCENT;
+ const root=db.collection("users").doc(u.uid);
+ const econ=root.collection("private").doc("economy");
+ const tr=db.collection("economyTransactions").doc(b.transactionId);
+ return db.runTransaction(async(t:any)=>{
+   const [old,rootSnap,econSnap]=await Promise.all([t.get(tr),t.get(root),t.get(econ)]);
+   if(old.exists){
+     const saved=old.data();
+     if(saved?.type!=="diamondExchange"||saved?.uid!==u.uid||saved?.diamondSpent!==diamond)
+       fail(409,"ID transaksi sudah digunakan");
+     return {replayed:true,...saved.result};
+   }
+   if(!rootSnap.exists)fail(404,"Profil akun tidak ditemukan");
+   const data=rootSnap.data()||{}, privateData=econSnap.data()||{};
+   const currentDiamond=toCoin(econSnap.exists&&typeof privateData.diamond==="number"?privateData.diamond:data.diamond);
+   const currentCoin=toCoin(econSnap.exists&&typeof privateData.coin==="number"?privateData.coin:data.coin);
+   if(currentDiamond<diamond)fail(400,"Saldo Diamond tidak mencukupi");
+   const nextDiamond=currentDiamond-diamond,nextCoin=currentCoin+coinAdded;
+   if(!Number.isSafeInteger(nextCoin))fail(400,"Saldo Coin melebihi batas");
+   const result={coin:nextCoin,diamond:nextDiamond,coinAdded,diamondSpent:diamond};
+   const updatedAt=FieldValue.serverTimestamp();
+   t.set(root,{coin:nextCoin,diamond:nextDiamond,updatedAt},{merge:true});
+   t.set(econ,{coin:nextCoin,diamond:nextDiamond,updatedAt},{merge:true});
+   t.create(tr,{type:"diamondExchange",uid:u.uid,diamondSpent:diamond,coinAdded,result,createdAt:FieldValue.serverTimestamp()});
+   t.create(root.collection("walletHistory").doc(b.transactionId+"_diamond"),{type:"diamondExchange",currency:"diamond",direction:"out",amount:diamond,createdAt:FieldValue.serverTimestamp()});
+   t.create(root.collection("walletHistory").doc(b.transactionId+"_coin"),{type:"diamondExchange",currency:"coin",direction:"in",amount:coinAdded,createdAt:FieldValue.serverTimestamp()});
+   return result;
+ });
 }
+
 async function gift(u:any,b:any) {
  const roomId=String(b.roomId||""),name=String(b.targetName||"").trim(),item=b.giftName;
  if(!/^[\w-]{4,160}$/.test(roomId)||!validId(b.transactionId)||!name||name.length>100||!Object.hasOwn(catalog,item)||!Number.isSafeInteger(b.quantity)||b.quantity<1||b.quantity>7777)fail(400,"Gift tidak valid");
@@ -289,6 +321,7 @@ Bun.serve({port:Number(Bun.env.PORT||3000),async fetch(req:Request){
   if(p==="/api/seller/fund")return res(await sellerFund(u,b));
   if(p==="/api/seller/send")return res(await sellerStockSend(u,b));
   if(p==="/api/coin/transfer")return res(await transfer(u,b));
+  if(p==="/api/diamond/exchange")return res(await exchangeDiamond(u,b));
   if(p==="/gift/send")return res(await gift(u,b));
   fail(404,"Endpoint tidak ditemukan");
  }catch(e:any){if(!(e instanceof E))console.error("request error",e?.name||"unknown");return res({error:e instanceof E?e.message:"Server gagal memproses permintaan"},e instanceof E?e.status:500)}
