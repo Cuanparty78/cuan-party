@@ -74,29 +74,10 @@ async function seller(u:any,b:any){
  await db.collection("coinSellers").doc(to.id).set({active,cuanId:String(b.targetId),name:to.data()?.displayName||"",updatedBy:u.uid,updatedAt:FieldValue.serverTimestamp()},{merge:true});
  return {targetId:b.targetId,active};
 }
+// The legacy endpoint moved seller PERSONAL wallet Coin; new seller operations
+// must debit seller stock only. Preserve an explicit error for old clients.
 async function transfer(u:any,b:any){
- // Legacy endpoint reserved to prevent mixing spendable wallet and seller stock.
- fail(410,"Transfer saldo pribadi Seller sudah tidak didukung. Gunakan fitur Stok Coin Seller.");
- if(!validId(b.transactionId)||!Number.isSafeInteger(b.amount)||b.amount<1||b.amount>1000000000)fail(400,"Data transaksi tidak valid");
- const to=await findAccount(b.targetId);
- if(to.id===u.uid)fail(400,"Tidak bisa transfer ke diri sendiri");
- const from=db.collection("users").doc(u.uid),tr=db.collection("economyTransactions").doc(b.transactionId);
- return db.runTransaction(async(t:any)=>{
-   const fe=from.collection("private").doc("economy"),te=to.ref.collection("private").doc("economy");
-   const [old,fr,frE,tt,ttE,ss]=await Promise.all([t.get(tr),t.get(from),t.get(fe),t.get(to.ref),t.get(te),t.get(db.collection("coinSellers").doc(u.uid))]);
-   if(old.exists){const d=old.data();if(d.type!=="sellerTransfer"||d.uid!==u.uid||d.targetUid!==to.id||d.amount!==b.amount)fail(409,"ID transaksi dipakai");return {replayed:true,coin:d.newCoin}}
-   if(!ss.exists||ss.data()?.active!==true)fail(403,"Seller tidak aktif");
-   if(!fr.exists||!tt.exists)fail(404,"Akun tidak ada");
-   const a=toCoin(frE.exists&&typeof frE.data()?.coin==="number"?frE.data()?.coin:fr.data()?.coin);
-   if(a<b.amount)fail(400,"Saldo seller kurang");
-   const v=toCoin(ttE.exists&&typeof ttE.data()?.coin==="number"?ttE.data()?.coin:tt.data()?.coin)+b.amount;
-   if(!Number.isSafeInteger(v))fail(400,"Saldo penerima melebihi batas");
-   for(const [ref,coin] of [[from,a-b.amount],[fe,a-b.amount],[to.ref,v],[te,v]])t.set(ref,{coin,updatedAt:FieldValue.serverTimestamp()},{merge:true});
-   t.create(tr,{type:"sellerTransfer",uid:u.uid,targetUid:to.id,targetCuanId:String(b.targetId),amount:b.amount,newCoin:a-b.amount,createdAt:FieldValue.serverTimestamp()});
-   t.create(from.collection("walletHistory").doc(b.transactionId),{type:"sellerTransfer",direction:"out",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
-   t.create(to.ref.collection("walletHistory").doc(b.transactionId),{type:"sellerTransfer",direction:"in",amount:b.amount,createdAt:FieldValue.serverTimestamp()});
-   return {targetId:b.targetId,credited:b.amount,remaining:a-b.amount};
- });
+ fail(410,"Gunakan Stok Coin Seller. Fitur transfer saldo pribadi sudah dinonaktifkan.");
 }
 
 function validCoinAmount(b:any){
