@@ -1,0 +1,12 @@
+{
+  "name": "cuan-party-workspace-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun run server/railway_function.ts"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0"
+  }
+}
