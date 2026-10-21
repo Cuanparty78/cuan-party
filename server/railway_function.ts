@@ -39,9 +39,16 @@ async function role(u:any) {
 async function findAccount(value:any){
  const id=String(value||"").trim();
  if(!/^[0-9]{6,13}$/.test(id))fail(400,"ID akun tidak valid");
- const q=await db.collection("users").where("cuanId","==",id).limit(2).get();
- if(q.size!==1)fail(404,q.size===0?"Akun tidak ditemukan":"ID akun ganda");
- return q.docs[0];
+ // Newly registered accounts store CUAN IDs as strings, but some older
+ // profiles stored them as integers. Accept either without allowing duplicates.
+ const users=db.collection("users");
+ const stringMatches=await users.where("cuanId","==",id).limit(2).get();
+ if(stringMatches.size>1)fail(409,"ID akun ganda");
+ const numericMatches=await users.where("cuanId","==",Number(id)).limit(2).get();
+ const matches=new Map<string,any>();
+ for(const doc of [...stringMatches.docs,...numericMatches.docs])matches.set(doc.id,doc);
+ if(matches.size!==1)fail(matches.size===0?404:409,matches.size===0?"Akun tidak ditemukan":"ID akun ganda");
+ return [...matches.values()][0];
 }
 async function issue(u:any,b:any){
  if(!owner(u))fail(403,"Hanya owner boleh membuat Coin baru");
@@ -68,7 +75,8 @@ async function seller(u:any,b:any){
  return {targetId:b.targetId,active};
 }
 async function transfer(u:any,b:any){
- if(!(await db.collection("coinSellers").doc(u.uid).get()).data()?.active)fail(403,"Hanya seller aktif");
+ // Legacy endpoint reserved to prevent mixing spendable wallet and seller stock.
+ fail(410,"Transfer saldo pribadi Seller sudah tidak didukung. Gunakan fitur Stok Coin Seller.");
  if(!validId(b.transactionId)||!Number.isSafeInteger(b.amount)||b.amount<1||b.amount>1000000000)fail(400,"Data transaksi tidak valid");
  const to=await findAccount(b.targetId);
  if(to.id===u.uid)fail(400,"Tidak bisa transfer ke diri sendiri");
@@ -103,6 +111,13 @@ async function sellerSelf(u:any){
  if(!/^[0-9]{6,13}$/.test(id))fail(400,"CUAN ID profil belum valid");
  await db.collection("coinSellers").doc(u.uid).set({active:true,cuanId:id,name:profile.data()?.name||profile.data()?.displayName||"JEP",updatedBy:u.uid,updatedAt:FieldValue.serverTimestamp()},{merge:true});
  return {active:true,cuanId:id};
+}
+async function sellerCheck(u:any,id:any){
+ if(!owner(u))fail(403,"Hanya Owner boleh memeriksa status Coin Seller");
+ const target=await findAccount(id);
+ const seller=await db.collection("coinSellers").doc(target.id).get();
+ const data=seller.data()||{};
+ return {cuanId:String(target.data()?.cuanId??id),name:target.data()?.displayName||"",active:data.active===true,stockCoin:toCoin(data.stockCoin)};
 }
 async function sellerMe(u:any){
  const [seller,root]=await Promise.all([db.collection("coinSellers").doc(u.uid).get(),db.collection("users").doc(u.uid).get()]);
@@ -317,6 +332,7 @@ Bun.serve({port:Number(Bun.env.PORT||3000),async fetch(req:Request){
   let b:any;try{b=JSON.parse(text)}catch{fail(400,"JSON tidak valid")}
   if(p==="/api/coin/issue")return res(await issue(u,b));
   if(p==="/api/seller/set")return res(await seller(u,b));
+  if(p==="/api/seller/check")return res(await sellerCheck(u,b.targetId));
   if(p==="/api/seller/self")return res(await sellerSelf(u));
   if(p==="/api/seller/fund")return res(await sellerFund(u,b));
   if(p==="/api/seller/send")return res(await sellerStockSend(u,b));
