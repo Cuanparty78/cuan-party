@@ -17,6 +17,16 @@ Jangan merge/trigger build/deploy sampai Owner menyetujui satu rilis gabungan.
 - Gift tetap terkunci pada produksi hingga pengujian settlement dan Firestore Rules selesai. Nilai persentase bukan lagi konfigurasi yang perlu diminta ke Owner.
 - Tidak mengaktifkan `GIFT_WRITES_ENABLED` dan tidak menyentuh data saldo produksi.
 
+## Panel OWNER / Coin Seller — tambahan 21 Oktober
+
+- Panel pada kode backend lama sempat menyusun HTML memakai **string tunggal yang melintasi baris** (JavaScript tidak valid). Pada branch review struktur HTML diubah menjadi satu template string valid; JavaScript panel berhasil lolos pemeriksaan sintaks dasar.
+- Login panel kini **tidak membuka dashboard sampai role diverifikasi oleh server**. Akun biasa melihat pesan ditolak dan tombol keluar; bukan tombol transfer Coin.
+- Owner mengirim Coin ke wallet dengan endpoint `/api/coin/issue`. Coin Seller **hanya menggunakan saldo stok** `/api/seller/send`; endpoint transfer saldo pribadi lama secara sengaja dinonaktifkan.
+- Aktivasi seller diverifikasi ulang dari server melalui endpoint owner-only `POST /api/seller/check`, yang mengembalikan nama akun, ID, status aktif, dan stok.
+- Pencarian ID mendukung `cuanId` dokumen lama bertipe angka dan dokumen baru bertipe string, dengan pemeriksaan duplikasi.
+- **Belum memperbaiki akar masalah Safari sepenuhnya:** `signInWithPopup` pada domain Railway dan `authDomain` Firebase yang berbeda mungkin mengalami masalah state/cookie. Pengujian dan penyesuaian hosting/proxy OAuth serta Firebase Authorized Domains diperlukan. Jangan klaim iPhone Safari sudah normal sebelum diuji.
+- Semua modifikasi hanya pada branch `cuan-party-stabilization-review`: belum di-merge dan **belum deploy/build**.
+
 ## Yang harus dikonfirmasi Owner
 1. **Sudah diputuskan:** Gift 1.000.000 Coin → 1.000.000 Diamond penerima → exchange 700.000 Coin.
 2. Pastikan Firestore Rules produksi mengizinkan read hanya saldo pengguna sendiri dan **menolak semua penulisan client ke coin, diamond, ekonomiTransactions, coinSellers, giftTransactions**, serta **melarang pesan tipe gift dari client** dan edit `giftTotal`.
